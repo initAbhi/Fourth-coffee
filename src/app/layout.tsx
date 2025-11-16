@@ -6,7 +6,7 @@ import Script from "next/script";
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
-  title: "Café Bliss - Premium Coffee Ordering",
+  title: "Fourth Coffee - Premium Coffee Ordering",
   description: "Order your favorite coffee with a delightful experience",
 };
 

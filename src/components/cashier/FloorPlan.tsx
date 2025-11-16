@@ -17,7 +17,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ onSelectTable }) => {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const gridCols = 4;
+      const gridCols = window.innerWidth >= 1920 ? 6 : window.innerWidth >= 1280 ? 5 : 4;
       
       if (e.key === "ArrowRight") {
         e.preventDefault();
@@ -103,7 +103,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ onSelectTable }) => {
 
       {/* Table Grid */}
       <div className="flex-1 overflow-auto p-5">
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 max-w-[1800px] mx-auto">
           {tables.map((table, index) => {
             const isSelected = index === selectedIndex;
             const statusColor = getStatusColor(table.status);

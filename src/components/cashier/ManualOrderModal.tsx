@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { X, Plus, Minus, Search } from "lucide-react";
 import { useCashier } from "@/contexts/CashierContext";
 import { toast } from "sonner";
+import { mockProducts as sampleProducts } from "@/lib/cashier-mock-data";
 
 interface ManualOrderModalProps {
   onClose: () => void;
@@ -17,17 +18,6 @@ interface OrderItem {
   modifiers?: string[];
   notes?: string;
 }
-
-const sampleProducts = [
-  { id: "1", name: "Cappuccino", price: 120, category: "coffee" },
-  { id: "2", name: "Espresso", price: 90, category: "coffee" },
-  { id: "3", name: "Latte", price: 140, category: "coffee" },
-  { id: "4", name: "Americano", price: 100, category: "coffee" },
-  { id: "5", name: "Croissant", price: 80, category: "pastries" },
-  { id: "6", name: "Muffin", price: 70, category: "pastries" },
-  { id: "7", name: "Bagel", price: 90, category: "pastries" },
-  { id: "8", name: "Cookie", price: 50, category: "cookies" },
-];
 
 export const ManualOrderModal: React.FC<ManualOrderModalProps> = ({ onClose }) => {
   const { tables, addManualOrder } = useCashier();
@@ -279,14 +269,14 @@ export const ManualOrderModal: React.FC<ManualOrderModalProps> = ({ onClose }) =
             <div className="p-4 bg-white border-t border-[#e0e0e0] flex gap-3">
               <button
                 onClick={onClose}
-                className="h-12 flex-[35] border border-[#b88933] text-[#563315] rounded-md font-medium text-sm hover:bg-[#f0ddb6]/30 transition-all"
+                className="h-12 flex-[0.35] border border-[#b88933] text-[#563315] rounded-md font-medium text-sm hover:bg-[#f0ddb6]/30 transition-all"
               >
                 Save as Draft
               </button>
               <button
                 onClick={handleProcessBilling}
                 disabled={!selectedTable || orderItems.length === 0}
-                className="h-12 flex-[60] bg-[#563315] text-[#f0ddb6] rounded-md font-medium text-sm hover:bg-[#6d4522] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="h-12 flex-[0.6] bg-[#563315] text-[#f0ddb6] rounded-md font-medium text-sm hover:bg-[#6d4522] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 Process Billing
               </button>

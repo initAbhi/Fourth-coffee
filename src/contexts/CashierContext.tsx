@@ -18,6 +18,7 @@ export interface TableOrder {
   startTime?: number;
   servedTime?: number;
   customerPhone?: string;
+  customerName?: string;
   customerNotes?: string;
   paymentMethod?: string;
   isPaid: boolean;
@@ -70,97 +71,12 @@ export const CashierProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [lastAction, setLastAction] = useState<{ type: string; data: any } | null>(null);
   const [undoTimer, setUndoTimer] = useState<NodeJS.Timeout | null>(null);
 
-  // Initialize with sample data
+  // Initialize with comprehensive mock data
   useEffect(() => {
-    const sampleTables: TableOrder[] = [
-      {
-        id: "t1",
-        tableNumber: "T-01",
-        items: [],
-        status: "idle",
-        total: 0,
-        isPaid: false
-      },
-      {
-        id: "t2",
-        tableNumber: "T-02",
-        items: [
-          { name: "Cappuccino", quantity: 2, price: 120, modifiers: ["Soy Milk", "Large"] },
-          { name: "Croissant", quantity: 1, price: 80 }
-        ],
-        status: "preparing",
-        total: 320,
-        startTime: Date.now() - 180000, // 3 minutes ago
-        isPaid: true
-      },
-      {
-        id: "t3",
-        tableNumber: "T-03",
-        items: [
-          { name: "Espresso", quantity: 1, price: 90 },
-          { name: "Muffin", quantity: 2, price: 70 }
-        ],
-        status: "aging",
-        total: 230,
-        startTime: Date.now() - 360000, // 6 minutes ago
-        isPaid: true
-      },
-      {
-        id: "t4",
-        tableNumber: "T-04",
-        items: [],
-        status: "idle",
-        total: 0,
-        isPaid: false
-      },
-      {
-        id: "t5",
-        tableNumber: "T-05",
-        items: [],
-        status: "idle",
-        total: 0,
-        isPaid: false
-      },
-      {
-        id: "t6",
-        tableNumber: "T-06",
-        items: [],
-        status: "idle",
-        total: 0,
-        isPaid: false
-      },
-    ];
-
-    const samplePaidOrders: PaidOrder[] = [
-      {
-        id: "po1",
-        orderNumber: "#12345",
-        items: [
-          { name: "Latte", quantity: 1, price: 140, modifiers: ["Oat Milk"] },
-          { name: "Bagel", quantity: 1, price: 90 }
-        ],
-        total: 230,
-        customerPhone: "+91 98765-43210",
-        paymentMethod: "UPI - GPay",
-        receivedAt: Date.now() - 120000, // 2 minutes ago
-        isPrinted: false
-      },
-      {
-        id: "po2",
-        orderNumber: "#12346",
-        items: [
-          { name: "Americano", quantity: 2, price: 100 },
-        ],
-        total: 200,
-        customerPhone: "+91 98765-43211",
-        paymentMethod: "Card",
-        receivedAt: Date.now() - 60000, // 1 minute ago
-        isPrinted: false
-      }
-    ];
-
-    setTables(sampleTables);
-    setPaidOrders(samplePaidOrders);
+    import("@/lib/cashier-mock-data").then((module) => {
+      setTables(module.mockTables);
+      setPaidOrders(module.mockPaidOrders);
+    });
   }, []);
 
   // Update order status based on time elapsed
@@ -198,22 +114,43 @@ export const CashierProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // Remove from paid orders
     setPaidOrders(prev => prev.filter(o => o.id !== orderId));
 
-    // Update table with order
-    setTables(prev =>
-      prev.map(table =>
-        table.tableNumber === tableNumber
-          ? {
-              ...table,
-              items: order.items,
-              total: order.total,
-              status: "preparing" as OrderStatus,
-              startTime: Date.now(),
-              customerPhone: order.customerPhone,
-              isPaid: true
-            }
-          : table
-      )
-    );
+    // Handle Takeaway orders differently
+    if (tableNumber === "Takeaway") {
+      // For takeaway, create a special table entry or handle differently
+      // For now, we'll just create a new table entry with "Takeaway" as table number
+      const takeawayTable: TableOrder = {
+        id: `takeaway_${Date.now()}`,
+        tableNumber: "Takeaway",
+        items: order.items,
+        total: order.total,
+        status: "preparing" as OrderStatus,
+        startTime: Date.now(),
+        customerPhone: order.customerPhone,
+        customerName: order.customerName,
+        isPaid: true,
+        paymentMethod: order.paymentMethod
+      };
+      setTables(prev => [...prev, takeawayTable]);
+    } else {
+      // Update existing table with order
+      setTables(prev =>
+        prev.map(table =>
+          table.tableNumber === tableNumber
+            ? {
+                ...table,
+                items: order.items,
+                total: order.total,
+                status: "preparing" as OrderStatus,
+                startTime: Date.now(),
+                customerPhone: order.customerPhone,
+                customerName: order.customerName,
+                isPaid: true,
+                paymentMethod: order.paymentMethod
+              }
+            : table
+        )
+      );
+    }
 
     // Set undo action
     setLastAction({ type: "confirmOrder", data: { orderId, tableNumber, order } });

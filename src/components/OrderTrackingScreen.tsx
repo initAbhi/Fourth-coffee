@@ -65,7 +65,7 @@ export function OrderTrackingScreen({ onBackHome }: OrderTrackingScreenProps) {
     },
     {
       id: "ready",
-      title: "Ready for Pickup",
+      title: "Ready",
       description: "Your order is ready!",
       icon: CheckCircle2,
       active: orderStatus === "ready",
@@ -97,7 +97,7 @@ export function OrderTrackingScreen({ onBackHome }: OrderTrackingScreenProps) {
         </motion.div>
 
         <h1 className="text-3xl font-bold text-cafe-dark mb-2">
-          {orderStatus === "preparing" && "Brewing Your Order"}
+          {orderStatus === "preparing" && "Estimated Time to serve"}
           {orderStatus === "ready" && "Order Ready! 🎉"}
           {orderStatus === "completed" && "Enjoy Your Coffee! ☕"}
         </h1>

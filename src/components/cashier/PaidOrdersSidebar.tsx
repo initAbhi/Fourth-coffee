@@ -17,9 +17,10 @@ export const PaidOrdersSidebar: React.FC<PaidOrdersSidebarProps> = ({
 }) => {
   const { paidOrders, confirmPaidOrder, tables } = useCashier();
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-  const [selectedTable, setSelectedTable] = useState<string>("");
+  const [selectedTables, setSelectedTables] = useState<Record<string, string>>({});
 
   const handleConfirm = (orderId: string) => {
+    const selectedTable = selectedTables[orderId];
     if (!selectedTable) {
       toast.error("Please select a table for this order");
       return;
@@ -27,7 +28,11 @@ export const PaidOrdersSidebar: React.FC<PaidOrdersSidebarProps> = ({
 
     confirmPaidOrder(orderId, selectedTable);
     toast.success(`Order sent to kitchen - KOT printed ✓`);
-    setSelectedTable("");
+    setSelectedTables(prev => {
+      const newState = { ...prev };
+      delete newState[orderId];
+      return newState;
+    });
   };
 
   const formatTimeAgo = (timestamp: number) => {
@@ -139,8 +144,8 @@ export const PaidOrdersSidebar: React.FC<PaidOrdersSidebarProps> = ({
                     Assign Table
                   </label>
                   <select
-                    value={selectedTable}
-                    onChange={(e) => setSelectedTable(e.target.value)}
+                    value={selectedTables[order.id] || ""}
+                    onChange={(e) => setSelectedTables(prev => ({ ...prev, [order.id]: e.target.value }))}
                     className="w-full h-9 px-2 text-sm border border-[#b88933]/30 rounded focus:outline-none focus:ring-2 focus:ring-[#b88933]"
                   >
                     <option value="">Select table...</option>
@@ -151,6 +156,7 @@ export const PaidOrdersSidebar: React.FC<PaidOrdersSidebarProps> = ({
                           {table.tableNumber}
                         </option>
                       ))}
+                    <option value="Takeaway">🛍️ Takeaway</option>
                   </select>
                 </div>
 
@@ -168,7 +174,7 @@ export const PaidOrdersSidebar: React.FC<PaidOrdersSidebarProps> = ({
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleConfirm(order.id)}
-                    disabled={!selectedTable}
+                    disabled={!selectedTables[order.id]}
                     className="flex-1 h-10 bg-[#2e7d32] text-white rounded-md font-medium text-sm hover:bg-[#256029] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                   >
                     <Check size={16} />

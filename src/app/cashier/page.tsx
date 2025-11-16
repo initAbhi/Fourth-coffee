@@ -90,7 +90,7 @@ export default function CashierDashboard() {
 
   return (
     <CashierProvider>
-      <div className="h-screen flex flex-col bg-[#faf7f0] overflow-hidden">
+      <div className="h-screen flex flex-col bg-[#faf7f0] overflow-hidden min-w-[1280px]">
         {/* Top Bar */}
         <TopBar onToggleSidebar={() => setSidebarCollapsed(prev => !prev)} />
 

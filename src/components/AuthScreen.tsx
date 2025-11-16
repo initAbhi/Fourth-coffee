@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Phone, ArrowRight } from "lucide-react";
+import Image from "next/image";
 
 interface AuthScreenProps {
   onComplete: () => void;
@@ -62,7 +63,7 @@ export function AuthScreen({ onComplete }: AuthScreenProps) {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     
     setIsLoading(false);
-    toast.success("Welcome to Café Bliss! 🎉");
+    toast.success("Welcome to Fourth Coffee! 🎉");
     onComplete();
   };
 
@@ -75,11 +76,20 @@ export function AuthScreen({ onComplete }: AuthScreenProps) {
       >
         <div className="text-center mb-8">
           <motion.div
-            className="inline-block text-6xl mb-4"
+            className="inline-block mb-4"
             animate={{ rotate: [0, -10, 10, -10, 0] }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            ☕
+            <div className="relative w-40 h-24 sm:w-48 sm:h-32">
+              <Image
+                src="/logo.png"
+                alt="Fourth Coffee"
+                fill
+                sizes="(max-width: 640px) 160px, 192px"
+                className="object-contain"
+                priority
+              />
+            </div>
           </motion.div>
           <h1 className="text-4xl font-bold text-cafe-dark mb-2">Welcome!</h1>
           <p className="text-cafe-dark/70">

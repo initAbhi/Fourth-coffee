@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Coffee } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 
 export default function CashierLoginPage() {
   const router = useRouter();
@@ -73,8 +74,17 @@ export default function CashierLoginPage() {
               repeat: Infinity,
               ease: "linear"
             }}
+            className="mb-4"
           >
-            <Coffee size={80} className="text-[#f0ddb6] mx-auto mb-4" />
+            <div className="relative w-64 h-40 mx-auto">
+              <Image
+                src="/logo.png"
+                alt="Fourth Coffee"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
           </motion.div>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -82,7 +92,7 @@ export default function CashierLoginPage() {
             transition={{ delay: 0.5 }}
             className="text-2xl font-bold text-[#f0ddb6]"
           >
-            Welcome to Café Bliss
+            Welcome to Fourth Coffee
           </motion.p>
         </motion.div>
       </motion.div>
@@ -99,7 +109,15 @@ export default function CashierLoginPage() {
       >
         {/* Logo */}
         <div className="flex justify-center mb-8">
-          <Coffee size={96} className="text-[#563315]" />
+          <div className="relative w-56 h-36">
+            <Image
+              src="/logo.png"
+              alt="Fourth Coffee"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
         </div>
 
         {/* Title */}

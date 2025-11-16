@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Coffee, Printer, Wifi, LogOut, WifiOff } from "lucide-react";
+import { Printer, Wifi, LogOut, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 interface TopBarProps {
   onToggleSidebar: () => void;
@@ -62,7 +63,15 @@ export const TopBar: React.FC<TopBarProps> = ({ onToggleSidebar }) => {
     <div className="h-14 bg-[#f0ddb6] border-b border-[#563315]/10 flex items-center px-4 shadow-sm">
       {/* Left Section */}
       <div className="flex items-center gap-3 w-[30%]">
-        <Coffee size={40} className="text-[#563315]" />
+        <div className="relative w-24 h-8">
+          <Image
+            src="/logo.png"
+            alt="Fourth Coffee"
+            fill
+            className="object-contain"
+            priority
+          />
+        </div>
         <span className="text-base font-medium text-[#563315]">Cashier</span>
         <div className="w-px h-6 bg-[#563315]/20" />
       </div>
