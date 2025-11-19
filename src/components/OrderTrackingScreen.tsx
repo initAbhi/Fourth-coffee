@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import Image from "next/image";
 
 interface OrderTrackingScreenProps {
   onBackHome: () => void;
@@ -91,8 +92,15 @@ export function OrderTrackingScreen({ onBackHome }: OrderTrackingScreenProps) {
           transition={{ type: "spring", duration: 0.6 }}
           className="inline-block mb-4"
         >
-          <div className="w-24 h-24 bg-cafe-dark rounded-full flex items-center justify-center text-5xl cafe-shadow-lg animate-float">
-            ☕
+          <div className="relative w-24 h-24 mx-auto cafe-shadow-lg animate-float">
+            <Image
+              src="/logo.png"
+              alt="Fourth Coffee"
+              fill
+              className="object-contain"
+              sizes="96px"
+              priority
+            />
           </div>
         </motion.div>
 

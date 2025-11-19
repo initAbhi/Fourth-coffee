@@ -16,7 +16,7 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
   onClose,
   onRefund,
 }) => {
-  const { tables, sendToKitchen, markServed } = useCashier();
+  const { tables, sendToKitchen, markServed, markTableIdle } = useCashier();
   const table = tables.find((t) => t.id === tableId);
 
   if (!table) return null;
@@ -30,8 +30,11 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
   };
 
   const getStatusBadge = () => {
+    // Check if table has pending order (needs approval)
+    const hasPendingOrder = table.items.length > 0 && table.status === "idle";
+    
     const statusMap = {
-      idle: { bg: "bg-[#e0e0e0]", text: "text-[#563315]", label: "Idle" },
+      idle: { bg: hasPendingOrder ? "bg-[#ff9800]" : "bg-[#e0e0e0]", text: hasPendingOrder ? "text-white" : "text-[#563315]", label: hasPendingOrder ? "Pending Approval" : "Idle" },
       preparing: { bg: "bg-[#f9a825]", text: "text-[#563315]", label: "Preparing" },
       aging: { bg: "bg-[#f57c00]", text: "text-white", label: "Aging" },
       critical: { bg: "bg-[#d32f2f]", text: "text-white", label: "Critical" },
@@ -194,10 +197,12 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
         <div className="border-t border-[#e0e0e0] bg-white p-4 space-y-3">
           {/* Action Buttons Grid */}
           <div className="grid grid-cols-2 gap-3">
-            {table.status === "idle" && table.items.length > 0 && (
+            {/* Show "Send to Kitchen" for pending orders (status is idle but has items) */}
+            {/* Also check orderStatus to ensure it's actually pending, not just idle table */}
+            {(table.status === "idle" && table.items.length > 0 && (table.orderStatus === "pending" || !table.orderStatus)) && (
               <button
                 onClick={handleSendToKitchen}
-                className="h-12 bg-[#2e7d32] text-white rounded-md font-medium text-sm hover:bg-[#256029] transition-all flex items-center justify-center gap-2"
+                className="h-12 bg-[#2e7d32] text-white rounded-md font-medium text-sm hover:bg-[#256029] transition-all flex items-center justify-center gap-2 col-span-2"
               >
                 <CheckCircle size={18} />
                 Send to Kitchen
@@ -211,6 +216,19 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
               >
                 <CheckCircle size={18} />
                 Mark Served
+              </button>
+            )}
+
+            {table.status === "served" && (
+              <button
+                onClick={() => {
+                  markTableIdle(tableId);
+                  onClose();
+                }}
+                className="h-12 bg-[#563315] text-white rounded-md font-medium text-sm hover:bg-[#6d4522] transition-all flex items-center justify-center gap-2 col-span-2"
+              >
+                <CheckCircle size={18} />
+                Mark Table Idle
               </button>
             )}
 

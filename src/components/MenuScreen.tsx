@@ -1,15 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus, ShoppingCart, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { products, categories, milkOptions, sizeOptions, type Product } from "@/lib/products";
+import { milkOptions, sizeOptions } from "@/lib/products";
 import { useCart } from "@/contexts/CartContext";
 import Image from "next/image";
 import { ProductDetailModal } from "./ProductDetailModal";
+import { apiClient } from "@/lib/api";
+import { toast } from "sonner";
+
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  image: string;
+  calories: number;
+  category: string;
+  popular?: boolean;
+  new?: boolean;
+}
 
 interface MenuScreenProps {
   onCartClick: () => void;
@@ -19,7 +33,48 @@ export function MenuScreen({ onCartClick }: MenuScreenProps) {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const { addItem, itemCount, total } = useCart();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Array<{id: string; name: string}>>([]);
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const { addItem, addItemWithQuantity, itemCount, total } = useCart();
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Load products
+        const productsRes = await apiClient.getProducts();
+        if (productsRes.success && productsRes.data) {
+          setProducts(productsRes.data);
+        }
+        
+        // Load categories
+        const categoriesRes = await apiClient.getCategories();
+        if (categoriesRes.success && categoriesRes.data) {
+          const allCategories = [{ id: "All", name: "All" }, ...categoriesRes.data];
+          setCategories(allCategories);
+        }
+        
+        // Load customer loyalty points
+        const sessionStr = localStorage.getItem("customer_session");
+        if (sessionStr) {
+          const session = JSON.parse(sessionStr);
+          if (session.loyaltyPoints) {
+            setLoyaltyPoints(session.loyaltyPoints.points || 0);
+          }
+        }
+      } catch (error) {
+        toast.error("Failed to load menu");
+        console.error(error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadData();
+  }, []);
 
   const filteredProducts = products.filter((product) => {
     const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
@@ -38,27 +93,37 @@ export function MenuScreen({ onCartClick }: MenuScreenProps) {
     });
   };
 
-  const handleAddToCart = (product: Product, quantity: number, milkType: string, size: string, note: string) => {
+  const handleAddToCart = (product: Product, quantity: number, milkType: string, size: string, note: string, sugarLevel?: string, temperature?: string) => {
     const milkPrice = milkOptions.find((m) => m.name === milkType)?.price || 0;
     const sizePrice = sizeOptions.find((s) => s.name === size)?.price || 0;
     const finalPrice = product.price + milkPrice + sizePrice;
 
-    const itemId = `${product.id}-${size}-${milkType}`;
+    const itemId = `${product.id}-${size}-${milkType}-${sugarLevel || 'medium'}-${temperature || 'hot'}`;
     
-    // Add the item multiple times to reach desired quantity
-    // The cart context will group items with same id, size, and milk
-    for (let i = 0; i < quantity; i++) {
-      addItem({
-        id: itemId,
-        name: product.name,
-        price: finalPrice,
-        image: product.image,
-        size: size,
-        milk: milkType,
-        notes: note || undefined,
-      });
-    }
+    // Add the item with the specified quantity in a single call
+    addItemWithQuantity({
+      id: itemId,
+      name: product.name,
+      price: finalPrice,
+      image: product.image,
+      size: size,
+      milk: milkType,
+      notes: note || undefined,
+      sugarLevel: sugarLevel || 'medium',
+      temperature: temperature || 'hot',
+    }, quantity);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-cafe-light flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-cafe-gold border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-cafe-dark/70">Loading menu...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-cafe-light pb-20">
@@ -75,10 +140,14 @@ export function MenuScreen({ onCartClick }: MenuScreenProps) {
           />
         </div>
         
-        <Badge className="bg-cafe-gold text-white px-4 py-2 rounded-full font-semibold">
+        <Button
+          variant="ghost"
+          onClick={() => window.location.href = "/points"}
+          className="bg-cafe-gold text-white px-4 py-2 rounded-full font-semibold hover:bg-cafe-gold/90"
+        >
           <Star className="w-4 h-4 mr-1 fill-current" />
-          120 pts
-        </Badge>
+          {loyaltyPoints} pts
+        </Button>
       </header>
 
       {/* Search Bar */}

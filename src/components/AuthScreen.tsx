@@ -8,13 +8,15 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Phone, ArrowRight } from "lucide-react";
 import Image from "next/image";
+import { CoffeePouringScreen } from "./CoffeePouringScreen";
+import { apiClient } from "@/lib/api";
 
 interface AuthScreenProps {
   onComplete: () => void;
 }
 
 export function AuthScreen({ onComplete }: AuthScreenProps) {
-  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [step, setStep] = useState<"phone" | "otp" | "pouring">("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,12 +29,38 @@ export function AuthScreen({ onComplete }: AuthScreenProps) {
     }
     setIsLoading(true);
     
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    
-    setIsLoading(false);
-    setStep("otp");
-    toast.success("Verification code sent!");
+    try {
+      // Format phone number (add +91 if not present)
+      let formattedPhone = phone.trim();
+      if (!formattedPhone.startsWith('+')) {
+        formattedPhone = formattedPhone.startsWith('91') ? `+${formattedPhone}` : `+91${formattedPhone}`;
+      }
+      
+      // For now, skip OTP and directly login (in production, implement OTP)
+      const response = await apiClient.customerLogin(formattedPhone);
+      
+      if (response.success && response.data) {
+        // Store customer session
+        localStorage.setItem("customer_session", JSON.stringify({
+          sessionId: response.data.sessionId,
+          customerId: response.data.customer.id,
+          phone: response.data.customer.phone,
+          name: response.data.customer.name,
+          loyaltyPoints: response.data.loyaltyPoints,
+          loginTime: new Date().toISOString()
+        }));
+        
+        setIsLoading(false);
+        // Skip OTP for now, go directly to pouring screen
+        setStep("pouring");
+        toast.success("Welcome to Fourth Coffee! 🎉");
+      } else {
+        throw new Error(response.error || "Login failed");
+      }
+    } catch (error) {
+      setIsLoading(false);
+      toast.error(error instanceof Error ? error.message : "Failed to login");
+    }
   };
 
   const handleOtpChange = (index: number, value: string) => {
@@ -59,13 +87,21 @@ export function AuthScreen({ onComplete }: AuthScreenProps) {
     
     setIsLoading(true);
     
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    // In production, verify OTP here
+    // For now, just proceed
+    await new Promise((resolve) => setTimeout(resolve, 500));
     
     setIsLoading(false);
     toast.success("Welcome to Fourth Coffee! 🎉");
-    onComplete();
+    setStep("pouring");
   };
+
+  // Show coffee pouring screen after verification
+  if (step === "pouring") {
+    return (
+      <CoffeePouringScreen onComplete={onComplete} />
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 cafe-gradient">

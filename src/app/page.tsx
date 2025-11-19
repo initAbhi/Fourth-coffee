@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { AnimatePresence } from "framer-motion";
 import { CartProvider } from "@/contexts/CartContext";
 import { LaunchScreen } from "@/components/LaunchScreen";
@@ -49,11 +49,13 @@ export default function Home() {
           )}
 
           {currentScreen === "checkout" && (
-            <CheckoutScreen
-              key="checkout"
-              onBack={() => setCurrentScreen("cart")}
-              onComplete={() => setCurrentScreen("tracking")}
-            />
+            <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+              <CheckoutScreen
+                key="checkout"
+                onBack={() => setCurrentScreen("cart")}
+                onComplete={() => setCurrentScreen("tracking")}
+              />
+            </Suspense>
           )}
 
           {currentScreen === "tracking" && (

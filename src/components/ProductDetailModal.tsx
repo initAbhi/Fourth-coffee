@@ -1,26 +1,73 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
 import Image from "next/image";
-import type { Product } from "@/lib/products";
-import { milkOptions, sizeOptions } from "@/lib/products";
+import { apiClient } from "@/lib/api";
+
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  image: string;
+  calories: number;
+  category: string;
+  popular?: boolean;
+  new?: boolean;
+}
 
 interface ProductDetailModalProps {
   product: Product;
   isOpen: boolean;
   onClose: () => void;
-  onAddToCart: (product: Product, quantity: number, milkType: string, size: string, note: string) => void;
+  onAddToCart: (product: Product, quantity: number, milkType: string, size: string, note: string, sugarLevel?: string, temperature?: string) => void;
 }
+
+const sugarOptions = [
+  { name: "No Sugar", value: "none" },
+  { name: "Less Sugar", value: "less" },
+  { name: "Medium Sugar", value: "medium" },
+  { name: "Extra Sugar", value: "extra" },
+];
+
+const temperatureOptions = [
+  { name: "Hot", value: "hot" },
+  { name: "Iced", value: "iced" },
+  { name: "Room Temperature", value: "room" },
+];
 
 export function ProductDetailModal({ product, isOpen, onClose, onAddToCart }: ProductDetailModalProps) {
   const [milkType, setMilkType] = useState("Regular");
   const [size, setSize] = useState("Regular");
+  const [sugarLevel, setSugarLevel] = useState("medium");
+  const [temperature, setTemperature] = useState("hot");
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
+  const [milkOptions, setMilkOptions] = useState<Array<{name: string; price: number}>>([]);
+  const [sizeOptions, setSizeOptions] = useState<Array<{name: string; price: number}>>([]);
+
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const milkRes = await apiClient.getProductOptions("milk");
+        if (milkRes.success && milkRes.data) {
+          setMilkOptions(milkRes.data);
+        }
+        const sizeRes = await apiClient.getProductOptions("size");
+        if (sizeRes.success && sizeRes.data) {
+          setSizeOptions(sizeRes.data);
+        }
+      } catch (error) {
+        console.error("Failed to load options");
+      }
+    };
+    if (isOpen) {
+      loadOptions();
+    }
+  }, [isOpen]);
 
   const calculatePrice = () => {
     const milkPrice = milkOptions.find((m) => m.name === milkType)?.price || 0;
@@ -29,11 +76,7 @@ export function ProductDetailModal({ product, isOpen, onClose, onAddToCart }: Pr
   };
 
   const handleAddToCart = () => {
-    onAddToCart(product, quantity, milkType, size, note);
-    toast.success("Added to cart ✓", {
-      description: `${product.name} added successfully`,
-      duration: 2000,
-    });
+    onAddToCart(product, quantity, milkType, size, note, sugarLevel, temperature);
     onClose();
   };
 
@@ -125,6 +168,56 @@ export function ProductDetailModal({ product, isOpen, onClose, onAddToCart }: Pr
                       {option.price !== 0 && ` (${option.price > 0 ? "+" : ""}₹${option.price})`}
                     </span>
                     {size === option.name && (
+                      <div className="w-5 h-5 rounded-full bg-cafe-gold flex items-center justify-center">
+                        <div className="w-2 h-2 bg-white rounded-full" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sugar Level */}
+            <div>
+              <h3 className="text-base font-semibold text-cafe-dark mb-3">Sugar Level</h3>
+              <div className="space-y-2">
+                {sugarOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setSugarLevel(option.value)}
+                    className={`w-full h-12 rounded-lg border-2 transition-all duration-200 flex items-center justify-between px-4 ${
+                      sugarLevel === option.value
+                        ? "border-cafe-gold bg-cafe-gold/10"
+                        : "border-cafe-gold/30 hover:border-cafe-gold/50"
+                    }`}
+                  >
+                    <span className="text-sm font-medium text-cafe-dark">{option.name}</span>
+                    {sugarLevel === option.value && (
+                      <div className="w-5 h-5 rounded-full bg-cafe-gold flex items-center justify-center">
+                        <div className="w-2 h-2 bg-white rounded-full" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Temperature */}
+            <div>
+              <h3 className="text-base font-semibold text-cafe-dark mb-3">Temperature</h3>
+              <div className="space-y-2">
+                {temperatureOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setTemperature(option.value)}
+                    className={`w-full h-12 rounded-lg border-2 transition-all duration-200 flex items-center justify-between px-4 ${
+                      temperature === option.value
+                        ? "border-cafe-gold bg-cafe-gold/10"
+                        : "border-cafe-gold/30 hover:border-cafe-gold/50"
+                    }`}
+                  >
+                    <span className="text-sm font-medium text-cafe-dark">{option.name}</span>
+                    {temperature === option.value && (
                       <div className="w-5 h-5 rounded-full bg-cafe-gold flex items-center justify-center">
                         <div className="w-2 h-2 bg-white rounded-full" />
                       </div>

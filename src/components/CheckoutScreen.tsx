@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, CreditCard, Smartphone, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,10 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCart } from "@/contexts/CartContext";
+import { apiClient } from "@/lib/api";
+import { toast } from "sonner";
 import confetti from "canvas-confetti";
+import Image from "next/image";
 
 interface CheckoutScreenProps {
   onBack: () => void;
@@ -16,35 +20,116 @@ interface CheckoutScreenProps {
 }
 
 export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
+  const searchParams = useSearchParams();
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const { total, clearCart, itemCount } = useCart();
+  const [tableNumber, setTableNumber] = useState<string | null>(null);
+  const { total, clearCart, itemCount, items } = useCart();
+  const [customerPhone, setCustomerPhone] = useState<string | null>(null);
+  const [customerName, setCustomerName] = useState<string | null>(null);
 
   const finalTotal = total * 1.08;
 
+  useEffect(() => {
+    // Get table from URL query params
+    const table = searchParams.get("table");
+    setTableNumber(table);
+    
+    // Get customer info from session
+    const sessionStr = localStorage.getItem("customer_session");
+    if (sessionStr) {
+      const session = JSON.parse(sessionStr);
+      setCustomerPhone(session.phone);
+      setCustomerName(session.name);
+    }
+  }, [searchParams]);
+
   const handlePayment = async () => {
+    if (!tableNumber) {
+      toast.error("Table number not found. Please scan the QR code again.");
+      return;
+    }
+
+    if (items.length === 0) {
+      toast.error("Your cart is empty");
+      return;
+    }
+
     setIsProcessing(true);
-    
-    // Simulate payment processing
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    
-    setIsProcessing(false);
-    setShowSuccess(true);
 
-    // Fire confetti
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ["#563315", "#f0ddb6", "#b88933"],
-    });
+    try {
+      // Convert cart items to order format
+      const orderItems = items.map(item => ({
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        modifiers: [
+          item.size && `Size: ${item.size}`,
+          item.milk && `Milk: ${item.milk}`,
+          item.notes && `Notes: ${item.notes}`,
+        ].filter(Boolean) as string[],
+      }));
 
-    // Clear cart and navigate to order tracking
-    setTimeout(() => {
-      clearCart();
-      onComplete();
-    }, 3000);
+      // Build customizations array
+      const customizations: Array<{ type: string; value: string }> = [];
+      items.forEach(item => {
+        if (item.sugarLevel) {
+          customizations.push({ type: 'sugar', value: item.sugarLevel });
+        }
+        if (item.temperature) {
+          customizations.push({ type: 'temperature', value: item.temperature });
+        }
+        if (item.milk) {
+          customizations.push({ type: 'milk', value: item.milk });
+        }
+        if (item.size) {
+          customizations.push({ type: 'size', value: item.size });
+        }
+      });
+
+      // Map payment method
+      const paymentMethodMap: Record<string, string> = {
+        card: "Card",
+        wallet: "UPI - Digital Wallet",
+      };
+
+      // Submit order to backend
+      const response = await apiClient.createOrder({
+        table: tableNumber,
+        items: orderItems,
+        total: finalTotal,
+        paymentMethod: paymentMethodMap[paymentMethod] || "Cash",
+        customizations: customizations,
+        customerPhone: customerPhone || undefined,
+        customerName: customerName || undefined,
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || "Failed to create order");
+      }
+
+      setIsProcessing(false);
+      setShowSuccess(true);
+
+      // Fire confetti
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ["#563315", "#f0ddb6", "#b88933"],
+      });
+
+      // Clear cart and navigate to order tracking
+      setTimeout(() => {
+        clearCart();
+        onComplete();
+      }, 3000);
+    } catch (error) {
+      setIsProcessing(false);
+      toast.error(error instanceof Error ? error.message : "Failed to place order");
+      console.error("Order submission error:", error);
+    }
   };
 
   if (showSuccess) {
@@ -76,7 +161,16 @@ export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
             animate={{ y: [0, -10, 0] }}
             transition={{ duration: 1, repeat: Infinity }}
           >
-            <div className="text-6xl">☕</div>
+            <div className="relative w-24 h-24 mx-auto">
+              <Image
+                src="/logo.png"
+                alt="Fourth Coffee"
+                fill
+                className="object-contain"
+                sizes="96px"
+                priority
+              />
+            </div>
           </motion.div>
 
           <p className="text-cafe-dark/70 mt-8">
@@ -102,7 +196,9 @@ export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-cafe-dark">Checkout</h1>
-            <p className="text-sm text-cafe-dark/70">{itemCount} items</p>
+            <p className="text-sm text-cafe-dark/70">
+              {itemCount} items{tableNumber && ` • Table ${tableNumber}`}
+            </p>
           </div>
         </div>
       </div>

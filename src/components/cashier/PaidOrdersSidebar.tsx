@@ -19,14 +19,16 @@ export const PaidOrdersSidebar: React.FC<PaidOrdersSidebarProps> = ({
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [selectedTables, setSelectedTables] = useState<Record<string, string>>({});
 
-  const handleConfirm = (orderId: string) => {
-    const selectedTable = selectedTables[orderId];
-    if (!selectedTable) {
+  const handleConfirm = (orderId: string, defaultTableNumber?: string) => {
+    // Use selected table if changed, otherwise use the order's table number
+    const tableNumber = selectedTables[orderId] || defaultTableNumber;
+    
+    if (!tableNumber) {
       toast.error("Please select a table for this order");
       return;
     }
 
-    confirmPaidOrder(orderId, selectedTable);
+    confirmPaidOrder(orderId, tableNumber);
     toast.success(`Order sent to kitchen - KOT printed ✓`);
     setSelectedTables(prev => {
       const newState = { ...prev };
@@ -138,27 +140,61 @@ export const PaidOrdersSidebar: React.FC<PaidOrdersSidebarProps> = ({
                   </div>
                 )}
 
-                {/* Table Assignment */}
-                <div>
-                  <label className="block text-xs font-medium text-[#563315] mb-1">
-                    Assign Table
-                  </label>
-                  <select
-                    value={selectedTables[order.id] || ""}
-                    onChange={(e) => setSelectedTables(prev => ({ ...prev, [order.id]: e.target.value }))}
-                    className="w-full h-9 px-2 text-sm border border-[#b88933]/30 rounded focus:outline-none focus:ring-2 focus:ring-[#b88933]"
-                  >
-                    <option value="">Select table...</option>
-                    {tables
-                      .filter((t) => t.status === "idle")
-                      .map((table) => (
-                        <option key={table.id} value={table.tableNumber}>
-                          {table.tableNumber}
-                        </option>
-                      ))}
-                    <option value="Takeaway">🛍️ Takeaway</option>
-                  </select>
-                </div>
+                {/* Table Information */}
+                {order.tableNumber ? (
+                  <div className="p-2 bg-[#f0ddb6]/30 rounded">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-[#563315]/70">Table</div>
+                      <div className="text-sm font-semibold text-[#563315]">
+                        {order.tableNumber}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedTables(prev => ({ ...prev, [order.id]: "" }))}
+                      className="text-xs text-[#563315]/60 hover:text-[#563315] mt-1 underline"
+                    >
+                      Change table
+                    </button>
+                    {selectedTables[order.id] === "" && (
+                      <select
+                        value={selectedTables[order.id] || order.tableNumber || ""}
+                        onChange={(e) => setSelectedTables(prev => ({ ...prev, [order.id]: e.target.value }))}
+                        className="w-full h-9 px-2 text-sm border border-[#b88933]/30 rounded focus:outline-none focus:ring-2 focus:ring-[#b88933] mt-2"
+                      >
+                        <option value={order.tableNumber}>{order.tableNumber}</option>
+                        {tables
+                          .filter((t) => t.status === "idle" && t.tableNumber !== order.tableNumber)
+                          .map((table) => (
+                            <option key={table.id} value={table.tableNumber}>
+                              {table.tableNumber}
+                            </option>
+                          ))}
+                        <option value="Takeaway">🛍️ Takeaway</option>
+                      </select>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-medium text-[#563315] mb-1">
+                      Assign Table *
+                    </label>
+                    <select
+                      value={selectedTables[order.id] || ""}
+                      onChange={(e) => setSelectedTables(prev => ({ ...prev, [order.id]: e.target.value }))}
+                      className="w-full h-9 px-2 text-sm border border-[#b88933]/30 rounded focus:outline-none focus:ring-2 focus:ring-[#b88933]"
+                    >
+                      <option value="">Select table...</option>
+                      {tables
+                        .filter((t) => t.status === "idle")
+                        .map((table) => (
+                          <option key={table.id} value={table.tableNumber}>
+                            {table.tableNumber}
+                          </option>
+                        ))}
+                      <option value="Takeaway">🛍️ Takeaway</option>
+                    </select>
+                  </div>
+                )}
 
                 {/* Payment Info */}
                 <div className="flex items-center justify-between">
@@ -173,8 +209,8 @@ export const PaidOrdersSidebar: React.FC<PaidOrdersSidebarProps> = ({
                 {/* Action Buttons */}
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleConfirm(order.id)}
-                    disabled={!selectedTables[order.id]}
+                    onClick={() => handleConfirm(order.id, order.tableNumber)}
+                    disabled={!order.tableNumber && !selectedTables[order.id]}
                     className="flex-1 h-10 bg-[#2e7d32] text-white rounded-md font-medium text-sm hover:bg-[#256029] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                   >
                     <Check size={16} />

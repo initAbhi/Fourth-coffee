@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
+import { apiClient } from "@/lib/api";
 
 export default function CashierLoginPage() {
   const router = useRouter();
@@ -25,31 +26,50 @@ export default function CashierLoginPage() {
 
     setIsLoading(true);
 
-    // Simulate authentication
-    setTimeout(() => {
-      // For demo: accept any credentials
-      if (userId && password) {
+    try {
+      // Authenticate with backend
+      const response = await apiClient.login(userId.trim(), password);
+
+      if (response.success && response.data) {
         // Store cashier session
-        localStorage.setItem("cashier_session", JSON.stringify({
-          userId,
-          name: "John Doe",
-          cashierId: Math.floor(Math.random() * 100) + 1,
+        const sessionData = {
+          sessionId: response.data.sessionId,
+          userId: response.data.cashier.userId,
+          name: response.data.cashier.name,
+          cashierId: response.data.cashier.id,
+          role: response.data.cashier.role,
           loginTime: new Date().toISOString()
-        }));
+        };
+        localStorage.setItem("cashier_session", JSON.stringify(sessionData));
+
+        toast.success(`Welcome, ${response.data.cashier.name}!`);
 
         // Show brand montage
         setShowMontage(true);
         setIsLoading(false);
 
         // Navigate to dashboard after montage
+        // Add a small delay to ensure session is committed to database
         setTimeout(() => {
-          router.push("/cashier");
+          // Set a flag in localStorage (more persistent than sessionStorage)
+          // Include timestamp to verify it's recent
+          localStorage.setItem("cashier_just_logged_in", JSON.stringify({
+            flag: true,
+            timestamp: Date.now(),
+            sessionId: response.data.sessionId
+          }));
+          // Use window.location for a hard navigation to ensure fresh state
+          window.location.href = "/cashier";
         }, 2500);
       } else {
         setIsLoading(false);
-        toast.error("Invalid ID or password. Try again.");
+        toast.error(response.error || "Invalid credentials. Please try again.");
       }
-    }, 1000);
+    } catch (error) {
+      setIsLoading(false);
+      console.error("Login error:", error);
+      toast.error("Failed to connect to server. Please check your connection.");
+    }
   };
 
   if (showMontage) {

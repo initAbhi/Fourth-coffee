@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import {
   Grid,
-  List,
   Plus,
   RefreshCw,
   Trash2,
@@ -12,7 +12,9 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  CheckCircle
+  CheckCircle,
+  QrCode,
+  FileText
 } from "lucide-react";
 import { useCashier } from "@/contexts/CashierContext";
 
@@ -20,25 +22,37 @@ interface SidebarProps {
   collapsed: boolean;
   onCollapse: (collapsed: boolean) => void;
   onShowManualOrder: () => void;
+  activeView?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   collapsed,
   onCollapse,
-  onShowManualOrder
+  onShowManualOrder,
+  activeView
 }) => {
   const { paidOrders } = useCashier();
-  const [activeItem, setActiveItem] = useState("floor");
+  const pathname = usePathname();
 
   const menuItems = [
-    { id: "floor", icon: Grid, label: "Floor Plan", shortcut: "Home", badge: null },
-    { id: "paid", icon: CheckCircle, label: "Paid Orders", shortcut: "F3", badge: paidOrders.length },
+    { id: "floor", href: "/cashier", icon: Grid, label: "Floor Plan", shortcut: "Home", badge: null },
+    { id: "paid", href: "/cashier/paid-orders", icon: CheckCircle, label: "Paid Orders", shortcut: "F3", badge: paidOrders.length },
     { id: "manual", icon: Plus, label: "New Manual Order", shortcut: "F2", badge: null, onClick: onShowManualOrder },
-    { id: "refunds", icon: RefreshCw, label: "Refunds", shortcut: "", badge: null },
-    { id: "wastage", icon: Trash2, label: "Wastage Log", shortcut: "", badge: null },
-    { id: "audit", icon: ClipboardList, label: "Audit Trail", shortcut: "F4", badge: null },
-    { id: "notes", icon: MessageSquare, label: "Admin Messages", shortcut: "", badge: 0 },
+    { id: "qr", href: "/cashier/qr-codes", icon: QrCode, label: "QR Codes", shortcut: "", badge: null },
+    { id: "reports", href: "/cashier/reports", icon: FileText, label: "Reports", shortcut: "", badge: null },
+    { id: "refunds", href: "/cashier/refunds", icon: RefreshCw, label: "Refunds", shortcut: "", badge: null },
+    { id: "wastage", href: "/cashier/wastage", icon: Trash2, label: "Wastage Log", shortcut: "", badge: null },
+    { id: "audit", href: "/cashier/audit-trail", icon: ClipboardList, label: "Audit Trail", shortcut: "F4", badge: null },
+    { id: "notes", href: "/cashier/admin-messages", icon: MessageSquare, label: "Admin Messages", shortcut: "", badge: 0 },
   ];
+
+  const isActive = (href: string | undefined) => {
+    if (!href) return false;
+    if (href === "/cashier") {
+      return pathname === "/cashier" || pathname === "/cashier/";
+    }
+    return pathname === href || pathname.startsWith(href + "/");
+  };
 
   return (
     <div
@@ -50,20 +64,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 py-4">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeItem === item.id;
+          const itemIsActive = isActive(item.href);
 
-          return (
+          const content = (
             <div
-              key={item.id}
-              onClick={() => {
-                setActiveItem(item.id);
-                if (item.onClick) item.onClick();
-              }}
               className={`relative flex items-center gap-3 px-4 py-3 cursor-pointer transition-all group ${
-                isActive
+                itemIsActive
                   ? "bg-[#b88933]/15 border-l-3 border-[#b88933]"
                   : "hover:bg-[#f0ddb6]/30"
               }`}
+              onClick={item.onClick}
             >
               <div className="relative">
                 <Icon size={24} className="text-[#563315]" />
@@ -95,6 +105,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             </div>
           );
+
+          if (item.href) {
+            return (
+              <Link key={item.id} href={item.href}>
+                {content}
+              </Link>
+            );
+          }
+
+          return <div key={item.id}>{content}</div>;
         })}
       </div>
 

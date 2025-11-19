@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { X, AlertTriangle } from "lucide-react";
 import { useCashier } from "@/contexts/CashierContext";
+import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
 
 interface RefundModalProps {
@@ -47,7 +48,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({ orderId, onClose }) =>
 
   const refundAmount = calculateRefundAmount();
 
-  const handleConfirmRefund = () => {
+  const handleConfirmRefund = async () => {
     if (!refundReason) {
       toast.error("Please select a refund reason");
       return;
@@ -58,10 +59,60 @@ export const RefundModal: React.FC<RefundModalProps> = ({ orderId, onClose }) =>
       return;
     }
 
-    if (confirm(`Confirm refund of ₹${refundAmount}? This will update the invoice and log the transaction.`)) {
-      // Process refund
-      toast.success("Refund processed successfully ✓");
-      onClose();
+    if (!table.items.length) {
+      toast.error("No order found for this table");
+      return;
+    }
+    
+    // Get the actual order ID from backend
+    let actualOrderId: string | null = null;
+    try {
+      const ordersRes = await apiClient.getOrders({ tableId: table.id });
+      if (ordersRes.success && ordersRes.data) {
+        // Find the most recent non-rejected order for this table
+        const activeOrder = ordersRes.data.find((o: any) => 
+          o.tableId === table.id && o.status !== "rejected" && o.status !== "served"
+        );
+        if (activeOrder) {
+          actualOrderId = activeOrder.id;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch orders:", error);
+    }
+    
+    if (!actualOrderId) {
+      toast.error("Could not find order for this table. Please try again.");
+      return;
+    }
+
+    const finalReason = refundReason === "Other" ? customReason.trim() : refundReason;
+
+    if (confirm(`Create refund request for ₹${refundAmount}? This will be sent to the manager for approval.`)) {
+      try {
+        // Get cashier session for requestedBy
+        const sessionStr = localStorage.getItem("cashier_session");
+        const session = sessionStr ? JSON.parse(sessionStr) : null;
+        const requestedBy = session?.name || session?.userId || "Cashier";
+
+        // Create refund request (will be pending until manager approves)
+        const response = await apiClient.createRefundRequest({
+          orderId: actualOrderId,
+          amount: refundAmount,
+          reason: finalReason,
+          requestedBy,
+        });
+
+        if (response.success) {
+          toast.success("Refund request created successfully. Waiting for manager approval.");
+          onClose();
+        } else {
+          toast.error(response.error || "Failed to create refund request");
+        }
+      } catch (error) {
+        console.error("Refund request error:", error);
+        toast.error("Failed to create refund request. Please try again.");
+      }
     }
   };
 
@@ -269,9 +320,14 @@ export const RefundModal: React.FC<RefundModalProps> = ({ orderId, onClose }) =>
           {/* Warning */}
           <div className="bg-[#f9a825]/10 border border-[#f9a825]/30 rounded-lg p-3 flex items-start gap-3">
             <AlertTriangle size={20} className="text-[#f9a825] flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-[#563315] italic">
-              ⚠️ This action will be logged in audit trail and cannot be undone.
-            </p>
+            <div className="flex-1">
+              <p className="text-xs text-[#563315] font-semibold mb-1">
+                ⚠️ Manager Approval Required
+              </p>
+              <p className="text-xs text-[#563315] italic">
+                All refunds require manager approval. This request will be sent to the manager for review.
+              </p>
+            </div>
           </div>
         </div>
 

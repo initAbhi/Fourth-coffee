@@ -54,10 +54,13 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ onSelectTable }) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [tables, selectedIndex, showQuickActions, onSelectTable, sendToKitchen, markServed]);
 
-  const getStatusColor = (status: OrderStatus) => {
+  const getStatusColor = (status: OrderStatus, table?: TableOrder) => {
+    // Check if idle table has pending order (needs approval)
+    const hasPendingOrder = status === "idle" && table && table.items.length > 0;
+    
     switch (status) {
       case "idle":
-        return "bg-[#e0e0e0] text-[#563315]";
+        return hasPendingOrder ? "bg-[#ff9800] text-white" : "bg-[#e0e0e0] text-[#563315]";
       case "preparing":
         return "bg-[#f9a825] text-[#563315]";
       case "aging":
@@ -106,7 +109,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ onSelectTable }) => {
         <div className="grid grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 max-w-[1800px] mx-auto">
           {tables.map((table, index) => {
             const isSelected = index === selectedIndex;
-            const statusColor = getStatusColor(table.status);
+            const statusColor = getStatusColor(table.status, table);
             const timer = formatTime(table.startTime);
 
             return (
@@ -125,12 +128,25 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ onSelectTable }) => {
                     {table.tableNumber}
                   </div>
 
-                  {/* Item Count Badge */}
-                  {table.items.length > 0 && (
-                    <div className="w-7 h-7 rounded-full bg-white/90 border-2 border-current flex items-center justify-center text-sm font-bold">
-                      {table.items.length}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {/* Payment Status Badge */}
+                    {(table as any).paymentStatus && (
+                      <div className={`text-xs px-2 py-1 rounded ${
+                        (table as any).isPaid 
+                          ? "bg-green-500 text-white" 
+                          : "bg-red-500 text-white"
+                      }`}>
+                        {(table as any).isPaid ? "Paid" : "Unpaid"}
+                      </div>
+                    )}
+                    
+                    {/* Item Count Badge */}
+                    {table.items.length > 0 && (
+                      <div className="w-7 h-7 rounded-full bg-white/90 border-2 border-current flex items-center justify-center text-sm font-bold">
+                        {table.items.length}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Order Summary */}

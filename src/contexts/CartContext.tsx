@@ -12,11 +12,14 @@ export interface CartItem {
   size?: string;
   milk?: string;
   notes?: string;
+  sugarLevel?: string;
+  temperature?: string;
 }
 
 interface CartContextType {
   items: CartItem[];
   addItem: (item: Omit<CartItem, "quantity">) => void;
+  addItemWithQuantity: (item: Omit<CartItem, "quantity">, quantity: number) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
@@ -53,6 +56,30 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const addItemWithQuantity = useCallback((item: Omit<CartItem, "quantity">, quantity: number) => {
+    setItems((prev) => {
+      const existingIndex = prev.findIndex((i) => 
+        i.id === item.id && 
+        i.size === item.size && 
+        i.milk === item.milk
+      );
+
+      if (existingIndex >= 0) {
+        const newItems = [...prev];
+        newItems[existingIndex].quantity += quantity;
+        toast.success("Added to cart", {
+          description: `${item.name} quantity updated`,
+        });
+        return newItems;
+      }
+
+      toast.success("Added to cart", {
+        description: quantity > 1 ? `${item.name} (${quantity}x)` : item.name,
+      });
+      return [...prev, { ...item, quantity }];
+    });
+  }, []);
+
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
     toast.info("Removed from cart");
@@ -79,7 +106,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ items, addItem, removeItem, updateQuantity, clearCart, total, itemCount }}
+      value={{ items, addItem, addItemWithQuantity, removeItem, updateQuantity, clearCart, total, itemCount }}
     >
       {children}
     </CartContext.Provider>
