@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Image from "next/image";
+import { useCustomerSession } from "@/hooks/useCustomerSession";
 
 interface OrderTrackingScreenProps {
   onBackHome: () => void;
@@ -16,6 +17,7 @@ type OrderStatus = "preparing" | "ready" | "completed";
 
 export function OrderTrackingScreen({ onBackHome }: OrderTrackingScreenProps) {
   const [orderStatus] = useState<OrderStatus>("preparing");
+  useCustomerSession(); // Extend session on activity
 
   const orderSteps = [
     {

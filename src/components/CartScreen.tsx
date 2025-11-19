@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/contexts/CartContext";
 import Image from "next/image";
+import { useCustomerSession } from "@/hooks/useCustomerSession";
 
 interface CartScreenProps {
   onBack: () => void;
@@ -15,6 +16,7 @@ interface CartScreenProps {
 
 export function CartScreen({ onBack, onCheckout }: CartScreenProps) {
   const { items, updateQuantity, removeItem, total, itemCount } = useCart();
+  useCustomerSession(); // Extend session on activity
 
   return (
     <div className="min-h-screen flex flex-col bg-background">

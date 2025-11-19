@@ -13,6 +13,8 @@ import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 import Image from "next/image";
+import { getCustomerSession, extendSession } from "@/lib/customerSession";
+import { useCustomerSession } from "@/hooks/useCustomerSession";
 
 interface CheckoutScreenProps {
   onBack: () => void;
@@ -31,6 +33,7 @@ export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [loyaltyPoints, setLoyaltyPoints] = useState<number>(0);
   const [loadingLoyaltyPoints, setLoadingLoyaltyPoints] = useState(false);
+  useCustomerSession(); // Extend session on activity
 
   const finalTotal = total * 1.08;
   const pointsRequired = Math.ceil(finalTotal); // 1 point = ₹1
@@ -41,9 +44,10 @@ export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
     setTableNumber(table);
     
     // Get customer info from session
-    const sessionStr = localStorage.getItem("customer_session");
-    if (sessionStr) {
-      const session = JSON.parse(sessionStr);
+    const session = getCustomerSession();
+    if (session) {
+      // Extend session on activity
+      extendSession();
       setCustomerPhone(session.phone);
       setCustomerName(session.name);
       setCustomerId(session.customerId || session.customer?.id || null);

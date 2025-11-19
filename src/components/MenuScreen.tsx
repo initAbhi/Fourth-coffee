@@ -10,6 +10,7 @@ import { milkOptions, sizeOptions } from "@/lib/products";
 import { useCart } from "@/contexts/CartContext";
 import Image from "next/image";
 import { ProductDetailModal } from "./ProductDetailModal";
+import { useCustomerSession } from "@/hooks/useCustomerSession";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -38,6 +39,7 @@ export function MenuScreen({ onCartClick }: MenuScreenProps) {
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const { addItem, addItemWithQuantity, itemCount, total } = useCart();
+  const { getSession } = useCustomerSession();
 
   useEffect(() => {
     const loadData = async () => {
@@ -58,12 +60,9 @@ export function MenuScreen({ onCartClick }: MenuScreenProps) {
         }
         
         // Load customer loyalty points
-        const sessionStr = localStorage.getItem("customer_session");
-        if (sessionStr) {
-          const session = JSON.parse(sessionStr);
-          if (session.loyaltyPoints) {
-            setLoyaltyPoints(session.loyaltyPoints.points || 0);
-          }
+        const session = getSession();
+        if (session && session.loyaltyPoints) {
+          setLoyaltyPoints(session.loyaltyPoints.points || 0);
         }
       } catch (error) {
         toast.error("Failed to load menu");

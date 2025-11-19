@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,16 +11,39 @@ import { Phone, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import { CoffeePouringScreen } from "./CoffeePouringScreen";
 import { apiClient } from "@/lib/api";
+import { saveCustomerSession } from "@/lib/customerSession";
 
 interface AuthScreenProps {
   onComplete: () => void;
 }
 
 export function AuthScreen({ onComplete }: AuthScreenProps) {
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<"phone" | "otp" | "pouring">("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [tableSlug, setTableSlug] = useState<string | null>(null);
+  const [tableNumber, setTableNumber] = useState<string | null>(null);
+  const [storedPhone, setStoredPhone] = useState<string>("");
+
+  // Get table information from URL
+  useEffect(() => {
+    const table = searchParams.get("table");
+    if (table) {
+      setTableSlug(table);
+      // Try to get table info to get table number
+      apiClient.getTableBySlug(table).then((response) => {
+        if (response.success && response.data) {
+          setTableNumber(response.data.tableNumber);
+        }
+      }).catch(() => {
+        // If slug doesn't work, might be table number directly
+        setTableNumber(table);
+      });
+    }
+  }, [searchParams]);
 
   const handlePhoneSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,30 +60,28 @@ export function AuthScreen({ onComplete }: AuthScreenProps) {
         formattedPhone = formattedPhone.startsWith('91') ? `+${formattedPhone}` : `+91${formattedPhone}`;
       }
       
-      // For now, skip OTP and directly login (in production, implement OTP)
-      const response = await apiClient.customerLogin(formattedPhone);
+      // Store phone for OTP verification
+      setStoredPhone(formattedPhone);
       
-      if (response.success && response.data) {
-        // Store customer session
-        localStorage.setItem("customer_session", JSON.stringify({
-          sessionId: response.data.sessionId,
-          customerId: response.data.customer.id,
-          phone: response.data.customer.phone,
-          name: response.data.customer.name,
-          loyaltyPoints: response.data.loyaltyPoints,
-          loginTime: new Date().toISOString()
-        }));
-        
-        setIsLoading(false);
-        // Skip OTP for now, go directly to pouring screen
-        setStep("pouring");
-        toast.success("Welcome to Fourth Coffee! 🎉");
-      } else {
-        throw new Error(response.error || "Login failed");
+      // In production, this would send OTP via SMS
+      // For now, simulate OTP sending
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      
+      setIsLoading(false);
+      setOtpSent(true);
+      setStep("otp");
+      toast.success("OTP sent to your phone!");
+      
+      // Auto-fill OTP for development (remove in production)
+      // For demo purposes, set a default OTP: 123456
+      if (process.env.NODE_ENV === "development") {
+        setTimeout(() => {
+          setOtp(["1", "2", "3", "4", "5", "6"]);
+        }, 500);
       }
     } catch (error) {
       setIsLoading(false);
-      toast.error(error instanceof Error ? error.message : "Failed to login");
+      toast.error(error instanceof Error ? error.message : "Failed to send OTP");
     }
   };
 
@@ -83,17 +105,61 @@ export function AuthScreen({ onComplete }: AuthScreenProps) {
   };
 
   const handleOtpSubmit = async (code: string) => {
-    if (code.length !== 6) return;
+    if (code.length !== 6) {
+      toast.error("Please enter complete 6-digit OTP");
+      return;
+    }
     
     setIsLoading(true);
     
-    // In production, verify OTP here
-    // For now, just proceed
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    
-    setIsLoading(false);
-    toast.success("Welcome to Fourth Coffee! 🎉");
-    setStep("pouring");
+    try {
+      // In production, verify OTP with backend here
+      // For now, accept any 6-digit code (or specific code in dev)
+      const isValidOtp = process.env.NODE_ENV === "development" 
+        ? code === "123456" || code.length === 6
+        : code.length === 6; // In production, verify with backend
+      
+      if (!isValidOtp) {
+        setIsLoading(false);
+        toast.error("Invalid OTP. Please try again.");
+        // Clear OTP inputs
+        setOtp(["", "", "", "", "", ""]);
+        return;
+      }
+      
+      // Verify OTP (simulated delay)
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      
+      // Now login the customer
+      const response = await apiClient.customerLogin(storedPhone);
+      
+      if (response.success && response.data) {
+        // Save customer session with table information
+        saveCustomerSession(
+          {
+            sessionId: response.data.sessionId,
+            customerId: response.data.customer.id,
+            phone: response.data.customer.phone,
+            name: response.data.customer.name,
+            loyaltyPoints: response.data.loyaltyPoints,
+            loginTime: new Date().toISOString(),
+          },
+          tableSlug || undefined,
+          tableNumber || undefined
+        );
+        
+        setIsLoading(false);
+        toast.success("Welcome to Fourth Coffee! 🎉");
+        setStep("pouring");
+      } else {
+        throw new Error(response.error || "Login failed");
+      }
+    } catch (error) {
+      setIsLoading(false);
+      toast.error(error instanceof Error ? error.message : "OTP verification failed");
+      // Clear OTP on error
+      setOtp(["", "", "", "", "", ""]);
+    }
   };
 
   // Show coffee pouring screen after verification
@@ -181,7 +247,10 @@ export function AuthScreen({ onComplete }: AuthScreenProps) {
               </div>
 
               <p className="text-sm text-cafe-dark/60 text-center mt-6">
-                We'll send you a verification code via SMS
+                {otpSent 
+                  ? "OTP sent! Check your phone for the verification code."
+                  : "We'll send you a verification code via SMS"
+                }
               </p>
             </motion.form>
           ) : (
@@ -193,31 +262,83 @@ export function AuthScreen({ onComplete }: AuthScreenProps) {
               exit={{ opacity: 0, x: -20 }}
             >
               <div className="space-y-6">
-                <div className="flex gap-2 justify-center">
-                  {otp.map((digit, index) => (
-                    <Input
-                      key={index}
-                      id={`otp-${index}`}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(index, e.target.value)}
-                      className="w-12 h-14 text-center text-2xl font-bold border-cafe-cream focus:border-cafe-gold"
-                      disabled={isLoading}
-                    />
-                  ))}
+                <div>
+                  <p className="text-sm text-cafe-dark/70 text-center mb-4">
+                    Enter the 6-digit code sent to<br />
+                    <span className="font-semibold text-cafe-dark">{storedPhone}</span>
+                  </p>
+                  <div className="flex gap-2 justify-center">
+                    {otp.map((digit, index) => (
+                      <Input
+                        key={index}
+                        id={`otp-${index}`}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, "");
+                          handleOtpChange(index, value);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Backspace" && !digit && index > 0) {
+                            const prevInput = document.getElementById(`otp-${index - 1}`);
+                            prevInput?.focus();
+                          }
+                        }}
+                        className="w-12 h-14 text-center text-2xl font-bold border-cafe-cream focus:border-cafe-gold"
+                        disabled={isLoading}
+                        autoFocus={index === 0}
+                      />
+                    ))}
+                  </div>
                 </div>
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full text-cafe-gold hover:text-cafe-dark"
-                  onClick={() => setStep("phone")}
-                  disabled={isLoading}
-                >
-                  Use a different number
-                </Button>
+                <div className="space-y-3">
+                  <Button
+                    type="button"
+                    className="w-full h-12 bg-cafe-dark hover:bg-cafe-gold text-white font-semibold rounded-xl"
+                    onClick={() => handleOtpSubmit(otp.join(""))}
+                    disabled={isLoading || otp.join("").length !== 6}
+                  >
+                    {isLoading ? "Verifying..." : "Verify OTP"}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full text-cafe-gold hover:text-cafe-dark"
+                    onClick={() => {
+                      setStep("phone");
+                      setOtp(["", "", "", "", "", ""]);
+                      setOtpSent(false);
+                    }}
+                    disabled={isLoading}
+                  >
+                    Use a different number
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full text-sm text-cafe-dark/60 hover:text-cafe-dark"
+                    onClick={async () => {
+                      setIsLoading(true);
+                      try {
+                        await new Promise((resolve) => setTimeout(resolve, 500));
+                        toast.success("OTP resent!");
+                      } catch (error) {
+                        toast.error("Failed to resend OTP");
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    Resend OTP
+                  </Button>
+                </div>
               </div>
 
               {isLoading && (

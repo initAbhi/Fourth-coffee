@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
 import Image from "next/image";
+import { getCustomerSession, validateAndRefreshSession } from "@/lib/customerSession";
 
 interface TopupOffer {
   id: string;
@@ -31,15 +32,25 @@ export default function PointsPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    const sessionStr = localStorage.getItem("customer_session");
-    if (!sessionStr) {
-      router.push("/");
-      return;
-    }
+    const checkSession = async () => {
+      const session = getCustomerSession();
+      if (!session) {
+        router.push("/");
+        return;
+      }
 
-    const session = JSON.parse(sessionStr);
-    setCustomerId(session.customerId);
-    loadData(session.customerId);
+      // Validate session
+      const isValid = await validateAndRefreshSession();
+      if (!isValid) {
+        router.push("/");
+        return;
+      }
+
+      setCustomerId(session.customerId);
+      loadData(session.customerId);
+    };
+
+    checkSession();
   }, [router]);
 
   const loadData = async (id: string) => {
