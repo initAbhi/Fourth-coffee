@@ -216,7 +216,7 @@ export default function CashierLayout({
             collapsed={sidebarCollapsed}
             onCollapse={setSidebarCollapsed}
             onShowManualOrder={() => setShowManualOrder(true)}
-            activeView={getActiveView()}
+            activeView={pathname}
           />
 
           {/* Main Content Area */}

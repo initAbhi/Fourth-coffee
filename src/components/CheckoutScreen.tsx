@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, CreditCard, Smartphone, Check } from "lucide-react";
+import { ArrowLeft, CreditCard, Smartphone, Check, Clock, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -28,8 +28,12 @@ export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
   const { total, clearCart, itemCount, items } = useCart();
   const [customerPhone, setCustomerPhone] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState<string | null>(null);
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [loyaltyPoints, setLoyaltyPoints] = useState<number>(0);
+  const [loadingLoyaltyPoints, setLoadingLoyaltyPoints] = useState(false);
 
   const finalTotal = total * 1.08;
+  const pointsRequired = Math.ceil(finalTotal); // 1 point = ₹1
 
   useEffect(() => {
     // Get table from URL query params
@@ -42,8 +46,30 @@ export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
       const session = JSON.parse(sessionStr);
       setCustomerPhone(session.phone);
       setCustomerName(session.name);
+      setCustomerId(session.customerId || session.customer?.id || null);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    // Load loyalty points if customer is logged in
+    const loadLoyaltyPoints = async () => {
+      if (!customerId) return;
+      
+      setLoadingLoyaltyPoints(true);
+      try {
+        const response = await apiClient.getCustomerProfile(customerId);
+        if (response.success && response.data?.loyaltyPoints) {
+          setLoyaltyPoints(response.data.loyaltyPoints.points || 0);
+        }
+      } catch (error) {
+        console.error("Failed to load loyalty points:", error);
+      } finally {
+        setLoadingLoyaltyPoints(false);
+      }
+    };
+
+    loadLoyaltyPoints();
+  }, [customerId]);
 
   const handlePayment = async () => {
     if (!tableNumber) {
@@ -88,10 +114,24 @@ export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
         }
       });
 
+      // Handle loyalty points payment
+      if (paymentMethod === "loyalty_points") {
+        if (!customerId) {
+          toast.error("Please login to use loyalty points");
+          return;
+        }
+        if (loyaltyPoints < pointsRequired) {
+          toast.error(`Insufficient loyalty points. You have ${loyaltyPoints} points, need ${pointsRequired} points.`);
+          return;
+        }
+      }
+
       // Map payment method
       const paymentMethodMap: Record<string, string> = {
         card: "Card",
         wallet: "UPI - Digital Wallet",
+        pay_later: "Pay Later",
+        loyalty_points: "Loyalty Points",
       };
 
       // Submit order to backend
@@ -103,6 +143,7 @@ export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
         customizations: customizations,
         customerPhone: customerPhone || undefined,
         customerName: customerName || undefined,
+        paymentStatus: paymentMethod === "pay_later" ? "unpaid" : paymentMethod === "loyalty_points" ? "paid" : undefined,
       });
 
       if (!response.success) {
@@ -210,21 +251,21 @@ export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-cafe-dark/70">Subtotal</span>
-              <span className="font-semibold">${total.toFixed(2)}</span>
+              <span className="font-semibold">₹{total.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-cafe-dark/70">Tax (8%)</span>
-              <span className="font-semibold">${(total * 0.08).toFixed(2)}</span>
+              <span className="font-semibold">₹{(total * 0.08).toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-cafe-dark/70">Service Fee</span>
-              <span className="font-semibold">$0.00</span>
+              <span className="font-semibold">₹0.00</span>
             </div>
             <div className="h-px bg-border my-3" />
             <div className="flex justify-between">
               <span className="font-bold text-cafe-dark">Total</span>
               <span className="text-2xl font-bold text-cafe-gold">
-                ${finalTotal.toFixed(2)}
+                ₹{finalTotal.toFixed(2)}
               </span>
             </div>
           </div>
@@ -274,6 +315,61 @@ export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
                   </div>
                 </div>
               </Label>
+
+              <Label
+                htmlFor="pay_later"
+                className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-smooth ${
+                  paymentMethod === "pay_later"
+                    ? "border-cafe-gold bg-cafe-cream/20"
+                    : "border-border"
+                }`}
+              >
+                <RadioGroupItem value="pay_later" id="pay_later" />
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center">
+                    <Clock className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-cafe-dark">Pay Later</p>
+                    <p className="text-sm text-cafe-dark/70">Pay at counter when leaving</p>
+                  </div>
+                </div>
+              </Label>
+
+              <Label
+                htmlFor="loyalty_points"
+                className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-smooth ${
+                  paymentMethod === "loyalty_points"
+                    ? "border-cafe-gold bg-cafe-cream/20"
+                    : "border-border"
+                } ${!customerId || loyaltyPoints < pointsRequired ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <RadioGroupItem 
+                  value="loyalty_points" 
+                  id="loyalty_points" 
+                  disabled={!customerId || loyaltyPoints < pointsRequired}
+                />
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center">
+                    <Star className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-cafe-dark">Pay with Loyalty Points</p>
+                    {loadingLoyaltyPoints ? (
+                      <p className="text-sm text-cafe-dark/70">Loading...</p>
+                    ) : customerId ? (
+                      <p className="text-sm text-cafe-dark/70">
+                        {loyaltyPoints >= pointsRequired 
+                          ? `You have ${loyaltyPoints} points (Need ${pointsRequired})`
+                          : `Insufficient points (${loyaltyPoints}/${pointsRequired})`
+                        }
+                      </p>
+                    ) : (
+                      <p className="text-sm text-cafe-dark/70">Login required</p>
+                    )}
+                  </div>
+                </div>
+              </Label>
             </div>
           </RadioGroup>
         </Card>
@@ -309,10 +405,14 @@ export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
               animate={{ opacity: [1, 0.5, 1] }}
               transition={{ duration: 1.5, repeat: Infinity }}
             >
-              Processing Payment...
+              {paymentMethod === "pay_later" ? "Placing Order..." : "Processing Payment..."}
             </motion.span>
+          ) : paymentMethod === "pay_later" ? (
+            "Place Order (Pay Later)"
+          ) : paymentMethod === "loyalty_points" ? (
+            `Pay ${pointsRequired} Points`
           ) : (
-            `Pay $${finalTotal.toFixed(2)}`
+            `Pay ₹${finalTotal.toFixed(2)}`
           )}
         </Button>
       </div>

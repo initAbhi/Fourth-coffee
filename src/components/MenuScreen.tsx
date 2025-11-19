@@ -305,6 +305,7 @@ export function MenuScreen({ onCartClick }: MenuScreenProps) {
           initial={{ y: 100 }}
           animate={{ y: 0 }}
           className="fixed bottom-4 left-4 right-4 h-16 bg-cafe-dark text-white flex items-center justify-between px-4 rounded-2xl shadow-2xl z-30"
+          style={{ zIndex: 30 }}
         >
           <div className="flex items-center gap-2">
             <span className="font-semibold">{itemCount} items</span>

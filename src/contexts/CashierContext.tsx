@@ -52,6 +52,7 @@ interface CashierContextType {
   paidOrders: PaidOrder[];
   isLoading: boolean;
   confirmPaidOrder: (orderId: string, tableNumber: string) => Promise<void>;
+  markAsPaid: (orderId: string, paymentMethod: string) => Promise<void>;
   sendToKitchen: (tableId: string) => Promise<void>;
   markServed: (tableId: string) => Promise<void>;
   markTableIdle: (tableId: string) => Promise<void>;
@@ -106,16 +107,24 @@ const mapOrderStatusToTableStatus = (orderStatus: string, startTime?: number): O
 
 // Helper to convert backend order to PaidOrder
 const convertToPaidOrder = (order: any): PaidOrder => {
+  // Handle timestamp conversion
+  let receivedAt = order.createdAt;
+  if (typeof receivedAt === 'string') {
+    receivedAt = new Date(receivedAt).getTime();
+  } else if (!receivedAt) {
+    receivedAt = Date.now();
+  }
+  
   return {
     id: order.id,
-    orderNumber: order.orderNumber,
-    items: order.items,
-    total: order.total,
-    customerPhone: order.customerPhone,
-    customerName: order.customerName,
-    tableNumber: order.tableNumber,
-    paymentMethod: order.paymentMethod || "Cash",
-    receivedAt: order.createdAt,
+    orderNumber: order.orderNumber || order.order_number || `ORD-${order.id.slice(0, 8)}`,
+    items: order.items || [],
+    total: order.total || 0,
+    customerPhone: order.customerPhone || order.customer_phone,
+    customerName: order.customerName || order.customer_name,
+    tableNumber: order.tableNumber || order.table_number,
+    paymentMethod: order.paymentMethod || order.payment_method || "Cash",
+    receivedAt: receivedAt,
     isPrinted: false,
   };
 };
@@ -632,6 +641,69 @@ export const CashierProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [undoTimer]);
 
+  const markAsPaid = useCallback(async (orderId: string, paymentMethod: string) => {
+    try {
+      const response = await apiClient.confirmPayment(orderId, {
+        paymentMethod,
+        confirmedBy: "Cashier",
+      });
+      
+      if (!response.success) {
+        toast.error(response.error || "Failed to mark order as paid");
+        return;
+      }
+
+      // Reload tables to reflect payment status change
+      const tablesWithPaymentRes = await apiClient.getTablesWithPaymentStatus();
+      if (tablesWithPaymentRes.success && tablesWithPaymentRes.data) {
+        const ordersRes = await apiClient.getOrders();
+        const orders = ordersRes.success && ordersRes.data ? ordersRes.data : [];
+        
+        const tableOrders: TableOrder[] = tablesWithPaymentRes.data.map((tableData: any) => {
+          if (tableData.status === 'idle' && !tableData.orderId) {
+            return {
+              id: tableData.id,
+              tableNumber: tableData.tableNumber,
+              items: [],
+              status: "idle" as OrderStatus,
+              total: 0,
+              isPaid: false,
+              paymentStatus: "unpaid",
+            };
+          }
+          
+          let tableOrder = undefined;
+          if (tableData.orderId && tableData.orderStatus && tableData.orderStatus !== "served") {
+            tableOrder = {
+              id: tableData.orderId,
+              tableId: tableData.id,
+              status: tableData.orderStatus,
+              items: tableData.orderItems || [],
+              total: tableData.total || 0,
+              paymentStatus: tableData.paymentStatus,
+              customerPhone: tableData.customerPhone,
+              customerName: tableData.customerName,
+            };
+            
+            const fullOrder = orders.find((o: any) => o.id === tableData.orderId && o.status !== "served");
+            if (fullOrder) {
+              tableOrder = { ...fullOrder, ...tableOrder, items: tableData.orderItems || fullOrder.items || [] };
+            }
+          }
+          
+          return convertToTableOrder(tableData, tableOrder);
+        });
+        
+        setTables(tableOrders);
+      }
+
+      toast.success(`Order marked as paid via ${paymentMethod}`);
+    } catch (error) {
+      toast.error("Failed to mark order as paid");
+      console.error(error);
+    }
+  }, []);
+
   const sendToKitchen = useCallback(async (tableId: string) => {
     // Find order for this table
     const table = tables.find(t => t.id === tableId);
@@ -852,6 +924,7 @@ export const CashierProvider: React.FC<{ children: React.ReactNode }> = ({ child
     paidOrders,
     isLoading,
     confirmPaidOrder,
+    markAsPaid,
     sendToKitchen,
     markServed,
     markTableIdle,

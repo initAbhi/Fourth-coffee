@@ -114,7 +114,7 @@ export function CartScreen({ onBack, onCheckout }: CartScreenProps) {
 
                           <div className="flex items-center gap-3">
                             <span className="text-lg font-bold text-cafe-gold">
-                              ${(item.price * item.quantity).toFixed(2)}
+                              ₹{(item.price * item.quantity).toFixed(2)}
                             </span>
                             <Button
                               size="icon"
@@ -143,17 +143,17 @@ export function CartScreen({ onBack, onCheckout }: CartScreenProps) {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-cafe-dark/70">Subtotal</span>
-                <span className="font-semibold">${total.toFixed(2)}</span>
+                <span className="font-semibold">₹{total.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-cafe-dark/70">Tax (8%)</span>
-                <span className="font-semibold">${(total * 0.08).toFixed(2)}</span>
+                <span className="font-semibold">₹{(total * 0.08).toFixed(2)}</span>
               </div>
               <Separator />
               <div className="flex justify-between">
                 <span className="font-bold text-cafe-dark">Total</span>
                 <span className="text-2xl font-bold text-cafe-gold">
-                  ${(total * 1.08).toFixed(2)}
+                  ₹{(total * 1.08).toFixed(2)}
                 </span>
               </div>
             </div>

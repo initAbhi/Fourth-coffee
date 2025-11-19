@@ -40,8 +40,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "manual", icon: Plus, label: "New Manual Order", shortcut: "F2", badge: null, onClick: onShowManualOrder },
     { id: "qr", href: "/cashier/qr-codes", icon: QrCode, label: "QR Codes", shortcut: "", badge: null },
     { id: "reports", href: "/cashier/reports", icon: FileText, label: "Reports", shortcut: "", badge: null },
-    { id: "refunds", href: "/cashier/refunds", icon: RefreshCw, label: "Refunds", shortcut: "", badge: null },
-    { id: "wastage", href: "/cashier/wastage", icon: Trash2, label: "Wastage Log", shortcut: "", badge: null },
+    // { id: "refunds", href: "/cashier/refunds", icon: RefreshCw, label: "Refunds", shortcut: "", badge: null },
+    // { id: "wastage", href: "/cashier/wastage", icon: Trash2, label: "Wastage Log", shortcut: "", badge: null },
     { id: "audit", href: "/cashier/audit-trail", icon: ClipboardList, label: "Audit Trail", shortcut: "F4", badge: null },
     { id: "notes", href: "/cashier/admin-messages", icon: MessageSquare, label: "Admin Messages", shortcut: "", badge: 0 },
   ];

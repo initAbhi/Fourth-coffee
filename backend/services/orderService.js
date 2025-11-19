@@ -23,7 +23,19 @@ class OrderService {
       const id = generateId();
       const orderNumber = generateOrderNumber();
       const isCashierOrder = data.isCashierOrder || false;
-      const paymentStatus = isCashierOrder ? 'unpaid' : (data.paymentMethod ? 'paid' : 'unpaid');
+      
+      // Determine payment status: use explicit status if provided, otherwise determine from payment method
+      let paymentStatus;
+      if (data.paymentStatus) {
+        paymentStatus = data.paymentStatus; // Explicit status (for Pay Later or Loyalty Points)
+      } else if (isCashierOrder) {
+        paymentStatus = 'unpaid'; // Cashier orders start unpaid
+      } else {
+        paymentStatus = data.paymentMethod ? 'paid' : 'unpaid';
+      }
+      
+      // Handle Loyalty Points payment - deduct points before creating order
+      // Note: We'll deduct points after order creation to have orderNumber available
 
       // Insert order
       const result = await client.query(
@@ -46,7 +58,7 @@ class OrderService {
           'pending',
           paymentStatus,
           data.paymentMethod || null,
-          !isCashierOrder && data.paymentMethod ? true : false,
+          paymentStatus === 'paid' && data.paymentMethod ? true : false,
           isCashierOrder,
           data.customerName || null,
           data.customerPhone || null,
@@ -75,6 +87,16 @@ class OrderService {
 
       // If payment is confirmed, create payment record
       if (paymentStatus === 'paid' && data.paymentMethod) {
+        // Handle Loyalty Points payment - deduct points
+        if (data.paymentMethod === 'Loyalty Points' && customerId) {
+          const pointsRequired = Math.ceil(data.total);
+          await customerService.redeemLoyaltyPoints(
+            customerId,
+            pointsRequired,
+            `Order payment: ${orderNumber}`
+          );
+        }
+        
         await this.createPaymentRecord(client, {
           orderId: id,
           customerId,
@@ -83,6 +105,9 @@ class OrderService {
           paymentType: this.getPaymentType(data.paymentMethod),
           confirmedBy: data.confirmedBy || null,
         });
+        
+        // Add timeline entry for payment
+        await this.addTimelineEntry(client, id, 'Payment Confirmed', 'Customer');
       }
 
       await client.query('COMMIT');
@@ -120,6 +145,16 @@ class OrderService {
     if (filters.paymentStatus) {
       query += ` AND payment_status = $${paramCount++}`;
       params.push(filters.paymentStatus);
+    }
+
+    if (filters.startDate) {
+      query += ` AND created_at >= $${paramCount++}`;
+      params.push(filters.startDate);
+    }
+
+    if (filters.endDate) {
+      query += ` AND created_at <= $${paramCount++}`;
+      params.push(filters.endDate);
     }
 
     query += ' ORDER BY created_at DESC';

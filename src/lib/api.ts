@@ -86,10 +86,14 @@ class ApiClient {
   }
 
   // Orders
-  async getOrders(params?: { status?: string; tableId?: string }) {
+  async getOrders(params?: { status?: string; tableId?: string; paymentStatus?: string; limit?: number; startDate?: string; endDate?: string }) {
     const query = new URLSearchParams();
     if (params?.status) query.append('status', params.status);
     if (params?.tableId) query.append('tableId', params.tableId);
+    if (params?.paymentStatus) query.append('paymentStatus', params.paymentStatus);
+    if (params?.limit) query.append('limit', params.limit.toString());
+    if (params?.startDate) query.append('startDate', params.startDate);
+    if (params?.endDate) query.append('endDate', params.endDate);
     const queryString = query.toString();
     return this.request<any[]>(`/orders${queryString ? `?${queryString}` : ''}`);
   }
@@ -103,6 +107,7 @@ class ApiClient {
     items: Array<{ name: string; quantity: number; price: number; modifiers?: string[] }>;
     total: number;
     paymentMethod?: string;
+    paymentStatus?: string;
     customerName?: string;
     customerPhone?: string;
     customerNotes?: string;

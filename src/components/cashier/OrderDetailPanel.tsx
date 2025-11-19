@@ -1,9 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { X, Clock, Printer, CheckCircle, Trash2, RefreshCw } from "lucide-react";
+import { X, Clock, Printer, CheckCircle, Trash2, RefreshCw, CreditCard } from "lucide-react";
 import { useCashier } from "@/contexts/CashierContext";
 import { toast } from "sonner";
+import { useState } from "react";
+import { apiClient } from "@/lib/api";
 
 interface OrderDetailPanelProps {
   tableId: string;
@@ -16,7 +18,9 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
   onClose,
   onRefund,
 }) => {
-  const { tables, sendToKitchen, markServed, markTableIdle } = useCashier();
+  const { tables, sendToKitchen, markServed, markTableIdle, markAsPaid } = useCashier();
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("Cash");
   const table = tables.find((t) => t.id === tableId);
 
   if (!table) return null;
@@ -180,7 +184,7 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
           )}
 
           {/* Payment Info */}
-          {table.isPaid && (
+          {table.isPaid ? (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-[#563315]">Payment Info</h3>
               <div className="text-sm text-[#2e7d32] flex items-center gap-2">
@@ -190,7 +194,17 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
                 Confirmed at {table.startTime ? new Date(table.startTime).toLocaleTimeString() : "N/A"}
               </div>
             </div>
-          )}
+          ) : table.paymentStatus === "unpaid" && table.paymentMethod === "Pay Later" ? (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-[#563315]">Payment Status</h3>
+              <div className="text-sm text-orange-600 flex items-center gap-2">
+                ⏰ Pay Later - Not Paid Yet
+              </div>
+              <div className="text-xs text-[#563315]/60">
+                Customer will pay at counter when leaving
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Footer Actions */}
@@ -206,6 +220,17 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
               >
                 <CheckCircle size={18} />
                 Send to Kitchen
+              </button>
+            )}
+
+            {/* Mark as Paid button for Pay Later orders */}
+            {table.paymentStatus === "unpaid" && table.paymentMethod === "Pay Later" && (
+              <button
+                onClick={() => setShowPaymentModal(true)}
+                className="h-12 bg-[#b88933] text-white rounded-md font-medium text-sm hover:bg-[#9d7229] transition-all flex items-center justify-center gap-2 col-span-2"
+              >
+                <CreditCard size={18} />
+                Mark as Paid
               </button>
             )}
 
@@ -270,6 +295,80 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Payment Method Selection Modal */}
+        {showPaymentModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={() => setShowPaymentModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-lg p-6 w-96 max-w-[90vw]"
+            >
+              <h3 className="text-lg font-bold text-[#563315] mb-4">Select Payment Method</h3>
+              <div className="space-y-2 mb-6">
+                {["Cash", "Card", "UPI - Digital Wallet", "UPI - GPay", "UPI - PhonePe"].map((method) => (
+                  <label
+                    key={method}
+                    className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                      selectedPaymentMethod === method
+                        ? "border-[#b88933] bg-[#f0ddb6]/30"
+                        : "border-gray-200"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value={method}
+                      checked={selectedPaymentMethod === method}
+                      onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm font-medium text-[#563315]">{method}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-[#563315] hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!table.id) return;
+                    try {
+                      // Find order ID
+                      const ordersRes = await apiClient.getOrders({ tableId: table.id });
+                      if (ordersRes.success && ordersRes.data) {
+                        const order = ordersRes.data.find((o: any) => o.status !== "served" && o.status !== "rejected");
+                        if (order) {
+                          await markAsPaid(order.id, selectedPaymentMethod);
+                          setShowPaymentModal(false);
+                          toast.success(`Order marked as paid via ${selectedPaymentMethod}`);
+                        } else {
+                          toast.error("Order not found");
+                        }
+                      }
+                    } catch (error) {
+                      toast.error("Failed to mark order as paid");
+                      console.error(error);
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-[#b88933] text-white rounded-md text-sm font-medium hover:bg-[#9d7229]"
+                >
+                  Confirm Payment
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </motion.div>
     </motion.div>
   );

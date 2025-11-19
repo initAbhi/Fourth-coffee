@@ -6,27 +6,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Download, 
   FileText, 
   FileSpreadsheet, 
   Mail, 
   Calendar,
   DollarSign,
-  CreditCard,
-  Wallet,
   Users,
   RefreshCw,
   TrendingUp,
-  TrendingDown,
   CheckCircle,
-  XCircle,
   Clock,
-  Gift,
-  Settings
+  Gift
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface ReportData {
   reportType: string;
@@ -49,13 +44,6 @@ interface ReportData {
     unpaidTables: number;
     totalTablesWithOrders: number;
   };
-  refunds: {
-    total: number;
-    totalAmount: number;
-    approved: number;
-    pending: number;
-    rejected: number;
-  };
   loyaltyPoints: {
     totalEarned: number;
     totalRedeemed: number;
@@ -73,12 +61,25 @@ interface ReportData {
   customizations: Record<string, number>;
 }
 
-const COLORS = ['#563315', '#b88933', '#f0ddb6', '#8B4513', '#A0522D', '#CD853F'];
+
+interface Transaction {
+  id: string;
+  orderNumber: string;
+  tableNumber: string;
+  customerName?: string;
+  items: Array<{ name: string; quantity: number; price: number }>;
+  total: number;
+  paymentMethod: string;
+  createdAt: string;
+  status: string;
+}
 
 export const ReportsView: React.FC = () => {
   const [reportType, setReportType] = useState<"daily" | "weekly" | "monthly">("daily");
   const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), "yyyy-MM"));
   const [autoEmailEnabled, setAutoEmailEnabled] = useState(false);
@@ -111,8 +112,51 @@ export const ReportsView: React.FC = () => {
     }
   };
 
+  const loadTransactions = async () => {
+    setTransactionsLoading(true);
+    try {
+      let startDate: string;
+      let endDate: string;
+
+      if (reportType === "daily") {
+        startDate = `${selectedDate}T00:00:00.000Z`;
+        endDate = `${selectedDate}T23:59:59.999Z`;
+      } else if (reportType === "weekly") {
+        const weekStart = startOfWeek(parseISO(selectedDate));
+        const weekEnd = endOfWeek(parseISO(selectedDate));
+        startDate = `${format(weekStart, "yyyy-MM-dd")}T00:00:00.000Z`;
+        endDate = `${format(weekEnd, "yyyy-MM-dd")}T23:59:59.999Z`;
+      } else {
+        const [year, month] = selectedMonth.split("-");
+        startDate = `${year}-${month}-01T00:00:00.000Z`;
+        // Get last day of the month (month is 1-indexed in Date constructor)
+        const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+        endDate = `${year}-${month}-${lastDay.toString().padStart(2, '0')}T23:59:59.999Z`;
+      }
+
+      const response = await apiClient.getOrders({
+        paymentStatus: "paid",
+        startDate,
+        endDate,
+        limit: 1000, // Get up to 1000 transactions
+      });
+
+      if (response.success && response.data) {
+        setTransactions(response.data);
+      } else {
+        toast.error(response.error || "Failed to load transactions");
+      }
+    } catch (error) {
+      console.error("Error loading transactions:", error);
+      toast.error("Failed to load transactions");
+    } finally {
+      setTransactionsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadReport();
+    loadTransactions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportType, selectedDate, selectedMonth]);
 
@@ -167,10 +211,6 @@ export const ReportsView: React.FC = () => {
               <div class="card-title">Paid Revenue</div>
               <div class="card-value">₹${reportData.revenue.paidRevenue.toFixed(2)}</div>
             </div>
-            <div class="card">
-              <div class="card-title">Unpaid Revenue</div>
-              <div class="card-value">₹${reportData.revenue.unpaidRevenue.toFixed(2)}</div>
-            </div>
           </div>
 
           <h2>Payment Methods</h2>
@@ -185,16 +225,6 @@ export const ReportsView: React.FC = () => {
             <tr><td>Paid Tables</td><td>${reportData.tables.paidTables}</td></tr>
             <tr><td>Unpaid Tables</td><td>${reportData.tables.unpaidTables}</td></tr>
             <tr><td>Total Tables with Orders</td><td>${reportData.tables.totalTablesWithOrders}</td></tr>
-          </table>
-
-          <h2>Refunds</h2>
-          <table>
-            <tr><th>Metric</th><th>Value</th></tr>
-            <tr><td>Total Refunds</td><td>${reportData.refunds.total}</td></tr>
-            <tr><td>Total Refund Amount</td><td>₹${reportData.refunds.totalAmount.toFixed(2)}</td></tr>
-            <tr><td>Approved</td><td>${reportData.refunds.approved}</td></tr>
-            <tr><td>Pending</td><td>${reportData.refunds.pending}</td></tr>
-            <tr><td>Rejected</td><td>${reportData.refunds.rejected}</td></tr>
           </table>
 
           <h2>Loyalty Points</h2>
@@ -275,7 +305,6 @@ export const ReportsView: React.FC = () => {
     lines.push(`Total Orders,${data.revenue.totalOrders}`);
     lines.push(`Total Revenue,${data.revenue.totalRevenue}`);
     lines.push(`Paid Revenue,${data.revenue.paidRevenue}`);
-    lines.push(`Unpaid Revenue,${data.revenue.unpaidRevenue}`);
     lines.push("");
     lines.push("Payment Methods");
     lines.push("Method,Count,Amount");
@@ -287,13 +316,6 @@ export const ReportsView: React.FC = () => {
     lines.push(`Paid Tables,${data.tables.paidTables}`);
     lines.push(`Unpaid Tables,${data.tables.unpaidTables}`);
     lines.push(`Total Tables with Orders,${data.tables.totalTablesWithOrders}`);
-    lines.push("");
-    lines.push("Refunds");
-    lines.push(`Total Refunds,${data.refunds.total}`);
-    lines.push(`Total Refund Amount,${data.refunds.totalAmount}`);
-    lines.push(`Approved,${data.refunds.approved}`);
-    lines.push(`Pending,${data.refunds.pending}`);
-    lines.push(`Rejected,${data.refunds.rejected}`);
     lines.push("");
     lines.push("Loyalty Points");
     lines.push(`Total Earned,${data.loyaltyPoints.totalEarned}`);
@@ -321,7 +343,6 @@ Report Summary:
 - Total Revenue: ₹${reportData.revenue.totalRevenue.toFixed(2)}
 - Total Orders: ${reportData.revenue.totalOrders}
 - Paid Revenue: ₹${reportData.revenue.paidRevenue.toFixed(2)}
-- Unpaid Revenue: ₹${reportData.revenue.unpaidRevenue.toFixed(2)}
 
 Period: ${format(parseISO(reportData.periodStart), "MMM dd, yyyy")} - ${format(parseISO(reportData.periodEnd), "MMM dd, yyyy")}
 Generated: ${format(parseISO(reportData.generatedAt), "MMM dd, yyyy HH:mm")}
@@ -340,11 +361,6 @@ Generated: ${format(parseISO(reportData.generatedAt), "MMM dd, yyyy HH:mm")}
     count: pm.count,
   })) || [];
 
-  const refundStatusData = reportData ? [
-    { name: "Approved", value: reportData.refunds.approved, color: "#22c55e" },
-    { name: "Pending", value: reportData.refunds.pending, color: "#f59e0b" },
-    { name: "Rejected", value: reportData.refunds.rejected, color: "#ef4444" },
-  ] : [];
 
   const customizationData = reportData ? Object.entries(reportData.customizations).map(([key, value]) => ({
     name: key,
@@ -477,7 +493,7 @@ Generated: ${format(parseISO(reportData.generatedAt), "MMM dd, yyyy HH:mm")}
         {!loading && reportData && (
           <div className="space-y-6">
             {/* Revenue Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <Card className="bg-white border-[#563315]/20">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -519,160 +535,76 @@ Generated: ${format(parseISO(reportData.generatedAt), "MMM dd, yyyy HH:mm")}
                   </div>
                 </CardContent>
               </Card>
-
-              <Card className="bg-white border-[#563315]/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-[#563315]/70">Unpaid Revenue</p>
-                      <p className="text-2xl font-bold text-[#563315] mt-1">
-                        ₹{reportData.revenue.unpaidRevenue.toFixed(2)}
-                      </p>
-                    </div>
-                    <Clock className="text-orange-600" size={32} />
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Payment Methods Chart */}
-              <Card className="bg-white border-[#563315]/20">
-                <CardHeader>
-                  <CardTitle className="text-[#563315]">Payment Methods</CardTitle>
-                  <CardDescription>Revenue breakdown by payment method</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={paymentMethodChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="value" fill="#563315" name="Amount (₹)" />
-                      <Bar dataKey="count" fill="#b88933" name="Count" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+            {/* Payment Methods Chart */}
+            <Card className="bg-white border-[#563315]/20">
+              <CardHeader>
+                <CardTitle className="text-[#563315]">Payment Methods</CardTitle>
+                <CardDescription>Revenue breakdown by payment method</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={paymentMethodChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="value" fill="#563315" name="Amount (₹)" />
+                    <Bar dataKey="count" fill="#b88933" name="Count" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
 
-              {/* Refund Status Chart */}
-              <Card className="bg-white border-[#563315]/20">
-                <CardHeader>
-                  <CardTitle className="text-[#563315]">Refund Status</CardTitle>
-                  <CardDescription>Refund requests breakdown</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={refundStatusData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, value }) => `${name}: ${value}`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {refundStatusData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Tables and Refunds */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Tables Summary */}
-              <Card className="bg-white border-[#563315]/20">
-                <CardHeader>
-                  <CardTitle className="text-[#563315]">Tables Summary</CardTitle>
-                  <CardDescription>Paid vs unpaid tables</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle className="text-green-600" size={24} />
-                        <div>
-                          <p className="font-semibold text-[#563315]">Paid Tables</p>
-                          <p className="text-sm text-[#563315]/70">{reportData.tables.paidTables} tables</p>
-                        </div>
-                      </div>
-                      <span className="text-2xl font-bold text-green-600">
-                        {reportData.tables.paidTables}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Clock className="text-orange-600" size={24} />
-                        <div>
-                          <p className="font-semibold text-[#563315]">Unpaid Tables</p>
-                          <p className="text-sm text-[#563315]/70">{reportData.tables.unpaidTables} tables</p>
-                        </div>
-                      </div>
-                      <span className="text-2xl font-bold text-orange-600">
-                        {reportData.tables.unpaidTables}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between p-4 bg-[#f0ddb6]/30 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Users className="text-[#563315]" size={24} />
-                        <div>
-                          <p className="font-semibold text-[#563315]">Total Tables with Orders</p>
-                          <p className="text-sm text-[#563315]/70">{reportData.tables.totalTablesWithOrders} tables</p>
-                        </div>
-                      </div>
-                      <span className="text-2xl font-bold text-[#563315]">
-                        {reportData.tables.totalTablesWithOrders}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Refunds Summary */}
-              <Card className="bg-white border-[#563315]/20">
-                <CardHeader>
-                  <CardTitle className="text-[#563315]">Refunds Summary</CardTitle>
-                  <CardDescription>Refund requests and amounts</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-[#f0ddb6]/30 rounded-lg">
+            {/* Tables Summary */}
+            <Card className="bg-white border-[#563315]/20">
+              <CardHeader>
+                <CardTitle className="text-[#563315]">Tables Summary</CardTitle>
+                <CardDescription>Paid vs unpaid tables</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="text-green-600" size={24} />
                       <div>
-                        <p className="font-semibold text-[#563315]">Total Refunds</p>
-                        <p className="text-sm text-[#563315]/70">{reportData.refunds.total} requests</p>
-                      </div>
-                      <span className="text-2xl font-bold text-[#563315]">
-                        ₹{reportData.refunds.totalAmount.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="p-3 bg-green-50 rounded-lg text-center">
-                        <p className="text-xs text-[#563315]/70">Approved</p>
-                        <p className="text-lg font-bold text-green-600">{reportData.refunds.approved}</p>
-                      </div>
-                      <div className="p-3 bg-orange-50 rounded-lg text-center">
-                        <p className="text-xs text-[#563315]/70">Pending</p>
-                        <p className="text-lg font-bold text-orange-600">{reportData.refunds.pending}</p>
-                      </div>
-                      <div className="p-3 bg-red-50 rounded-lg text-center">
-                        <p className="text-xs text-[#563315]/70">Rejected</p>
-                        <p className="text-lg font-bold text-red-600">{reportData.refunds.rejected}</p>
+                        <p className="font-semibold text-[#563315]">Paid Tables</p>
+                        <p className="text-sm text-[#563315]/70">{reportData.tables.paidTables} tables</p>
                       </div>
                     </div>
+                    <span className="text-2xl font-bold text-green-600">
+                      {reportData.tables.paidTables}
+                    </span>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                  <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Clock className="text-orange-600" size={24} />
+                      <div>
+                        <p className="font-semibold text-[#563315]">Unpaid Tables</p>
+                        <p className="text-sm text-[#563315]/70">{reportData.tables.unpaidTables} tables</p>
+                      </div>
+                    </div>
+                    <span className="text-2xl font-bold text-orange-600">
+                      {reportData.tables.unpaidTables}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-[#f0ddb6]/30 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Users className="text-[#563315]" size={24} />
+                      <div>
+                        <p className="font-semibold text-[#563315]">Total Tables with Orders</p>
+                        <p className="text-sm text-[#563315]/70">{reportData.tables.totalTablesWithOrders} tables</p>
+                      </div>
+                    </div>
+                    <span className="text-2xl font-bold text-[#563315]">
+                      {reportData.tables.totalTablesWithOrders}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Loyalty Points and Wallet */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -749,6 +681,68 @@ Generated: ${format(parseISO(reportData.generatedAt), "MMM dd, yyyy HH:mm")}
                 </CardContent>
               </Card>
             </div>
+
+            {/* Transaction History */}
+            <Card className="bg-white border-[#563315]/20">
+              <CardHeader>
+                <CardTitle className="text-[#563315]">Transaction History</CardTitle>
+                <CardDescription>All paid transactions for the selected period</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {transactionsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <RefreshCw className="animate-spin text-[#563315]" size={32} />
+                  </div>
+                ) : transactions.length === 0 ? (
+                  <div className="text-center py-12 text-[#563315]/70">
+                    No transactions found for the selected period
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-[#563315]">Order #</TableHead>
+                          <TableHead className="text-[#563315]">Date & Time</TableHead>
+                          <TableHead className="text-[#563315]">Table</TableHead>
+                          <TableHead className="text-[#563315]">Customer</TableHead>
+                          <TableHead className="text-[#563315]">Items</TableHead>
+                          <TableHead className="text-[#563315]">Payment Method</TableHead>
+                          <TableHead className="text-[#563315] text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {transactions.map((transaction) => (
+                          <TableRow key={transaction.id}>
+                            <TableCell className="font-medium text-[#563315]">
+                              {transaction.orderNumber}
+                            </TableCell>
+                            <TableCell className="text-[#563315]/70">
+                              {format(parseISO(transaction.createdAt), "MMM dd, yyyy HH:mm")}
+                            </TableCell>
+                            <TableCell className="text-[#563315]">
+                              {transaction.tableNumber || "N/A"}
+                            </TableCell>
+                            <TableCell className="text-[#563315]/70">
+                              {transaction.customerName || "Guest"}
+                            </TableCell>
+                            <TableCell className="text-[#563315]/70">
+                              {transaction.items?.length || 0} item(s)
+                            </TableCell>
+                            <TableCell className="text-[#563315]">
+                              {transaction.paymentMethod || "N/A"}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-[#563315]">
+                              ₹{transaction.total?.toFixed(2) || "0.00"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Customization Usage Trends */}
             {customizationData.length > 0 && (

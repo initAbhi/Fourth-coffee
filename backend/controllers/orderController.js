@@ -12,6 +12,8 @@ class OrderController {
         tableId: req.query.tableId,
         paymentStatus: req.query.paymentStatus,
         limit: req.query.limit ? parseInt(req.query.limit) : null,
+        startDate: req.query.startDate || null,
+        endDate: req.query.endDate || null,
       };
       const orders = await orderService.getAllOrders(filters);
       res.json({
@@ -59,6 +61,7 @@ class OrderController {
         items, 
         total, 
         paymentMethod, 
+        paymentStatus,
         customerName, 
         customerPhone, 
         customerNotes,
@@ -110,6 +113,7 @@ class OrderController {
         customizations: customizations || [],
         total,
         paymentMethod,
+        paymentStatus, // Allow explicit payment status (for Pay Later and Loyalty Points)
         customerName,
         customerPhone,
         customerNotes,
