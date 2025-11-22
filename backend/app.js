@@ -27,6 +27,8 @@ const wastageRoutes = require('./routes/wastageRoutes');
 const auditTrailRoutes = require('./routes/auditTrailRoutes');
 const adminMessagesRoutes = require('./routes/adminMessagesRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const adminAuthRoutes = require('./routes/adminAuthRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 // Import services
 const SocketService = require('./services/socketService');
@@ -103,6 +105,8 @@ app.use('/api/wastage', wastageRoutes);
 app.use('/api/audit-trail', auditTrailRoutes);
 app.use('/api/admin-messages', adminMessagesRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/admin-auth', adminAuthRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling
 app.use(errorHandler);

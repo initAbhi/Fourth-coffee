@@ -298,6 +298,167 @@ const setupDatabase = async () => {
       )
     `);
 
+    // Create admins table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admins (
+        id VARCHAR(255) PRIMARY KEY,
+        username VARCHAR(100) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'admin', -- 'super_admin', 'admin', 'inventory_admin', 'marketing_admin'
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_login TIMESTAMP
+      )
+    `);
+
+    // Create admin_sessions table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_sessions (
+        session_id VARCHAR(255) PRIMARY KEY,
+        admin_id VARCHAR(255) REFERENCES admins(id) ON DELETE CASCADE,
+        username VARCHAR(100) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL,
+        login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create cafes table (for multi-cafe support)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cafes (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        address TEXT,
+        manager_name VARCHAR(255),
+        manager_phone VARCHAR(20),
+        total_employees INTEGER DEFAULT 0,
+        region VARCHAR(100),
+        is_active BOOLEAN DEFAULT TRUE,
+        last_sync TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create central_inventory table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS central_inventory (
+        id VARCHAR(255) PRIMARY KEY,
+        sku VARCHAR(100) UNIQUE NOT NULL,
+        item_name VARCHAR(255) NOT NULL,
+        category VARCHAR(100) NOT NULL,
+        quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        unit VARCHAR(50) NOT NULL DEFAULT 'pieces',
+        cost_price DECIMAL(10, 2) NOT NULL,
+        shelf_life_days INTEGER,
+        supplier VARCHAR(255),
+        last_supplied TIMESTAMP,
+        expiry_date TIMESTAMP,
+        freshness_percentage DECIMAL(5, 2) DEFAULT 100,
+        status VARCHAR(50) DEFAULT 'ok', -- 'ok', 'low_stock', 'expiring', 'out_of_stock'
+        threshold_quantity DECIMAL(10, 2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create inventory_batches table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS inventory_batches (
+        id VARCHAR(255) PRIMARY KEY,
+        batch_code VARCHAR(100) UNIQUE NOT NULL,
+        sku VARCHAR(100) NOT NULL,
+        quantity DECIMAL(10, 2) NOT NULL,
+        cost_price DECIMAL(10, 2) NOT NULL,
+        supplier VARCHAR(255),
+        purchase_date TIMESTAMP NOT NULL,
+        expiry_date TIMESTAMP,
+        freshness_percentage DECIMAL(5, 2) DEFAULT 100,
+        cafe_id VARCHAR(255) REFERENCES cafes(id),
+        qr_code TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create dispatch_orders table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS dispatch_orders (
+        id VARCHAR(255) PRIMARY KEY,
+        order_number VARCHAR(100) UNIQUE NOT NULL,
+        cafe_id VARCHAR(255) REFERENCES cafes(id),
+        items JSONB NOT NULL, -- [{sku, item_name, quantity, cost_price}]
+        total_cost DECIMAL(10, 2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'dispatched', 'delivered', 'cancelled'
+        invoice_pdf_path TEXT,
+        qr_code TEXT,
+        created_by VARCHAR(255) NOT NULL,
+        dispatched_at TIMESTAMP,
+        delivered_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create customer_feedback table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS customer_feedback (
+        id VARCHAR(255) PRIMARY KEY,
+        order_id VARCHAR(255) REFERENCES orders(id),
+        customer_id VARCHAR(255) REFERENCES customers(id),
+        cafe_id VARCHAR(255) REFERENCES cafes(id),
+        rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+        feedback_type VARCHAR(100), -- 'taste', 'service', 'ambiance', 'other'
+        comment TEXT,
+        is_complaint BOOLEAN DEFAULT FALSE,
+        is_resolved BOOLEAN DEFAULT FALSE,
+        resolved_by VARCHAR(255),
+        resolved_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create marketing_campaigns table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS marketing_campaigns (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        template_name VARCHAR(255),
+        message TEXT NOT NULL,
+        audience_segment VARCHAR(50) NOT NULL, -- 'all', 'frequent', 'dormant', 'vip'
+        media_url TEXT, -- Image/Video URL
+        coupon_qr TEXT,
+        personalization_tags JSONB DEFAULT '{}'::jsonb,
+        status VARCHAR(50) DEFAULT 'draft', -- 'draft', 'scheduled', 'sent', 'cancelled'
+        scheduled_at TIMESTAMP,
+        sent_at TIMESTAMP,
+        sent_count INTEGER DEFAULT 0,
+        delivered_count INTEGER DEFAULT 0,
+        read_count INTEGER DEFAULT 0,
+        clicked_count INTEGER DEFAULT 0,
+        created_by VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create inventory_transfers table (for tracking inventory movement)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS inventory_transfers (
+        id VARCHAR(255) PRIMARY KEY,
+        transfer_type VARCHAR(50) NOT NULL, -- 'dispatch', 'return', 'adjustment'
+        from_location VARCHAR(255), -- 'central' or cafe_id
+        to_location VARCHAR(255), -- cafe_id or 'central'
+        sku VARCHAR(100) NOT NULL,
+        quantity DECIMAL(10, 2) NOT NULL,
+        batch_code VARCHAR(100),
+        reason TEXT,
+        created_by VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Create indexes for better performance
     await client.query(`CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_orders_table_id ON orders(table_id)`);
@@ -314,6 +475,15 @@ const setupDatabase = async () => {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_audit_trail_actor ON audit_trail(actor)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_admin_messages_read ON admin_messages(read)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_admin_messages_created_at ON admin_messages(created_at)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_central_inventory_sku ON central_inventory(sku)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_central_inventory_status ON central_inventory(status)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_dispatch_orders_cafe_id ON dispatch_orders(cafe_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_dispatch_orders_status ON dispatch_orders(status)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_customer_feedback_cafe_id ON customer_feedback(cafe_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_customer_feedback_rating ON customer_feedback(rating)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_marketing_campaigns_status ON marketing_campaigns(status)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_inventory_transfers_sku ON inventory_transfers(sku)`);
 
     await client.query('COMMIT');
     console.log('✅ Database tables created successfully');

@@ -251,6 +251,157 @@ const seedData = async () => {
       console.log(`✅ Seeded ${messages.length} admin messages`);
     }
 
+    // Seed admin user
+    const adminCheck = await client.query('SELECT COUNT(*) FROM admins');
+    if (adminCheck.rows[0].count === '0') {
+      const adminId = generateId();
+      await client.query(
+        `INSERT INTO admins (id, username, email, password_hash, name, role, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6, TRUE)`,
+        [
+          adminId,
+          'admin',
+          'admin@cafeflow.com',
+          'admin123', // In production, use bcrypt hash
+          'Admin User',
+          'super_admin',
+        ]
+      );
+      console.log('✅ Seeded admin user (username: admin, password: admin123)');
+    }
+
+    // Seed cafes
+    const cafesCheck = await client.query('SELECT COUNT(*) FROM cafes');
+    if (cafesCheck.rows[0].count === '0') {
+      const cafes = [
+        {
+          name: 'Cafe Downtown',
+          address: '123 Main Street, Downtown',
+          managerName: 'Rajesh Kumar',
+          managerPhone: '+919876543210',
+          totalEmployees: 8,
+          region: 'Downtown',
+        },
+        {
+          name: 'Cafe Uptown',
+          address: '456 Park Avenue, Uptown',
+          managerName: 'Priya Sharma',
+          managerPhone: '+919876543211',
+          totalEmployees: 6,
+          region: 'Uptown',
+        },
+        {
+          name: 'Cafe Central',
+          address: '789 Central Plaza',
+          managerName: 'Amit Patel',
+          managerPhone: '+919876543212',
+          totalEmployees: 10,
+          region: 'Central',
+        },
+      ];
+
+      for (const cafe of cafes) {
+        await client.query(
+          `INSERT INTO cafes (id, name, address, manager_name, manager_phone, total_employees, region, is_active, last_sync)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, CURRENT_TIMESTAMP)`,
+          [
+            generateId(),
+            cafe.name,
+            cafe.address,
+            cafe.managerName,
+            cafe.managerPhone,
+            cafe.totalEmployees,
+            cafe.region,
+          ]
+        );
+      }
+      console.log(`✅ Seeded ${cafes.length} cafes`);
+    }
+
+    // Seed central inventory
+    const inventoryCheck = await client.query('SELECT COUNT(*) FROM central_inventory');
+    if (inventoryCheck.rows[0].count === '0') {
+      const inventoryItems = [
+        { sku: 'COFFEE-001', itemName: 'Arabica Beans 1kg', category: 'Coffee Beans', quantity: 50, unit: 'kg', costPrice: 800, shelfLifeDays: 365, supplier: 'Bean Supplier Co.', thresholdQuantity: 20 },
+        { sku: 'COFFEE-002', itemName: 'Robusta Beans 1kg', category: 'Coffee Beans', quantity: 30, unit: 'kg', costPrice: 600, shelfLifeDays: 365, supplier: 'Bean Supplier Co.', thresholdQuantity: 15 },
+        { sku: 'MILK-001', itemName: 'Whole Milk', category: 'Dairy', quantity: 100, unit: 'liters', costPrice: 60, shelfLifeDays: 7, supplier: 'Dairy Farm', thresholdQuantity: 30 },
+        { sku: 'MILK-002', itemName: 'Soy Milk', category: 'Dairy', quantity: 40, unit: 'liters', costPrice: 80, shelfLifeDays: 14, supplier: 'Plant Based Co.', thresholdQuantity: 15 },
+        { sku: 'MILK-003', itemName: 'Almond Milk', category: 'Dairy', quantity: 25, unit: 'liters', costPrice: 120, shelfLifeDays: 14, supplier: 'Plant Based Co.', thresholdQuantity: 10 },
+        { sku: 'PASTRY-001', itemName: 'Butter Croissant', category: 'Pastries', quantity: 200, unit: 'pieces', costPrice: 30, shelfLifeDays: 3, supplier: 'Bakery Inc.', thresholdQuantity: 50 },
+        { sku: 'COOKIE-001', itemName: 'Chocolate Chip Cookie', category: 'Cookies', quantity: 150, unit: 'pieces', costPrice: 25, shelfLifeDays: 7, supplier: 'Bakery Inc.', thresholdQuantity: 40 },
+        { sku: 'SYRUP-001', itemName: 'Vanilla Syrup', category: 'Syrups', quantity: 20, unit: 'liters', costPrice: 200, shelfLifeDays: 180, supplier: 'Flavor Co.', thresholdQuantity: 5 },
+        { sku: 'SYRUP-002', itemName: 'Caramel Syrup', category: 'Syrups', quantity: 15, unit: 'liters', costPrice: 200, shelfLifeDays: 180, supplier: 'Flavor Co.', thresholdQuantity: 5 },
+      ];
+
+      for (const item of inventoryItems) {
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + item.shelfLifeDays);
+        const freshness = 100 - (Math.random() * 20); // 80-100% freshness
+
+        await client.query(
+          `INSERT INTO central_inventory 
+           (id, sku, item_name, category, quantity, unit, cost_price, shelf_life_days, 
+            supplier, expiry_date, freshness_percentage, threshold_quantity, status, last_supplied)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 
+                   CASE WHEN $5 < $12 THEN 'low_stock' ELSE 'ok' END, CURRENT_TIMESTAMP)`,
+          [
+            generateId(),
+            item.sku,
+            item.itemName,
+            item.category,
+            item.quantity,
+            item.unit,
+            item.costPrice,
+            item.shelfLifeDays,
+            item.supplier,
+            expiryDate,
+            freshness,
+            item.thresholdQuantity,
+          ]
+        );
+      }
+      console.log(`✅ Seeded ${inventoryItems.length} central inventory items`);
+    }
+
+    // Seed customer feedback
+    const feedbackCheck = await client.query('SELECT COUNT(*) FROM customer_feedback');
+    if (feedbackCheck.rows[0].count === '0') {
+      const customersResult = await client.query('SELECT id FROM customers LIMIT 5');
+      const cafesResult = await client.query('SELECT id FROM cafes LIMIT 3');
+      
+      if (customersResult.rows.length > 0 && cafesResult.rows.length > 0) {
+        const feedbacks = [
+          { rating: 5, feedbackType: 'taste', comment: 'Excellent coffee!', isComplaint: false },
+          { rating: 4, feedbackType: 'service', comment: 'Great service, fast delivery', isComplaint: false },
+          { rating: 3, feedbackType: 'taste', comment: 'Too sweet', isComplaint: true },
+          { rating: 5, feedbackType: 'ambiance', comment: 'Love the atmosphere', isComplaint: false },
+          { rating: 2, feedbackType: 'service', comment: 'Order took too long', isComplaint: true },
+        ];
+
+        for (let i = 0; i < feedbacks.length; i++) {
+          const feedback = feedbacks[i];
+          const customerId = customersResult.rows[i % customersResult.rows.length].id;
+          const cafeId = cafesResult.rows[i % cafesResult.rows.length].id;
+
+          await client.query(
+            `INSERT INTO customer_feedback 
+             (id, customer_id, cafe_id, rating, feedback_type, comment, is_complaint, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP - INTERVAL '${i} days')`,
+            [
+              generateId(),
+              customerId,
+              cafeId,
+              feedback.rating,
+              feedback.feedbackType,
+              feedback.comment,
+              feedback.isComplaint,
+            ]
+          );
+        }
+        console.log(`✅ Seeded ${feedbacks.length} customer feedback entries`);
+      }
+    }
+
     await client.query('COMMIT');
     console.log('✅ Seed data completed successfully');
   } catch (error) {

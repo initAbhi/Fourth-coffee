@@ -530,6 +530,118 @@ class ApiClient {
       body: JSON.stringify(data),
     });
   }
+
+  // Admin Authentication
+  async adminLogin(username: string, password: string) {
+    return this.request<{
+      sessionId: string;
+      admin: {
+        id: string;
+        username: string;
+        name: string;
+        email: string;
+        role: string;
+      };
+    }>('/admin-auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+  }
+
+  async verifyAdminSession(sessionId: string) {
+    return this.request<{
+      admin: {
+        username: string;
+        name: string;
+        role: string;
+      };
+    }>('/admin-auth/verify', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId }),
+    });
+  }
+
+  async adminLogout(sessionId: string) {
+    return this.request('/admin-auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId }),
+    });
+  }
+
+  // Admin Dashboard
+  async getAdminDashboard() {
+    return this.request<any>('/admin/dashboard');
+  }
+
+  async getCafes() {
+    return this.request<any[]>('/admin/cafes');
+  }
+
+  async getCafeDetail(cafeId: string, period?: string) {
+    const query = period ? `?period=${period}` : '';
+    return this.request<any>(`/admin/cafes/${cafeId}${query}`);
+  }
+
+  // Central Inventory
+  async getCentralInventory(params?: { category?: string; status?: string; search?: string }) {
+    const query = new URLSearchParams();
+    if (params?.category) query.append('category', params.category);
+    if (params?.status) query.append('status', params.status);
+    if (params?.search) query.append('search', params.search);
+    const queryString = query.toString();
+    return this.request<any[]>(`/admin/inventory${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getInventoryItem(sku: string) {
+    return this.request<any>(`/admin/inventory/${sku}`);
+  }
+
+  async createDispatchOrder(data: {
+    cafeId: string;
+    items: Array<{ sku: string; quantity: number }>;
+    createdBy: string;
+  }) {
+    return this.request<any>('/admin/inventory/dispatch', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getDispatchOrder(orderId: string) {
+    return this.request<any>(`/admin/inventory/dispatch/${orderId}`);
+  }
+
+  // Marketing
+  async getMarketingCampaigns(params?: { status?: string; limit?: number }) {
+    const query = new URLSearchParams();
+    if (params?.status) query.append('status', params.status);
+    if (params?.limit) query.append('limit', params.limit.toString());
+    const queryString = query.toString();
+    return this.request<any[]>(`/admin/marketing/campaigns${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async createMarketingCampaign(data: {
+    name: string;
+    templateName?: string;
+    message: string;
+    audienceSegment: string;
+    mediaUrl?: string;
+    couponQr?: string;
+    personalizationTags?: any;
+    scheduledAt?: string;
+    createdBy: string;
+  }) {
+    return this.request<any>('/admin/marketing/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async sendMarketingCampaign(campaignId: string) {
+    return this.request<any>(`/admin/marketing/campaigns/${campaignId}/send`, {
+      method: 'POST',
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);
