@@ -100,6 +100,16 @@ export function isSessionValid(session: CustomerSession | null): boolean {
  */
 export function clearCustomerSession(): void {
   localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(LAST_ACTIVITY_KEY);
+}
+
+/**
+ * Logout customer - clears session and dispatches logout event
+ */
+export function logoutCustomer(): void {
+  clearCustomerSession();
+  // Dispatch custom event to trigger navigation to auth screen
+  window.dispatchEvent(new CustomEvent("customer_logout"));
 }
 
 /**

@@ -57,9 +57,16 @@ export default function Home() {
     };
     window.addEventListener("customer_session_expired", handleSessionExpired);
 
+    // Listen for logout events
+    const handleLogout = () => {
+      setCurrentScreen("auth");
+    };
+    window.addEventListener("customer_logout", handleLogout);
+
     return () => {
       cleanup();
       window.removeEventListener("customer_session_expired", handleSessionExpired);
+      window.removeEventListener("customer_logout", handleLogout);
     };
   }, []);
 

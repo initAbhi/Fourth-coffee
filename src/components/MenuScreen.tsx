@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, ShoppingCart, Star } from "lucide-react";
+import { Search, Plus, ShoppingCart, Star, LogOut } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { ProductDetailModal } from "./ProductDetailModal";
 import { useCustomerSession } from "@/hooks/useCustomerSession";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
+import { logoutCustomer } from "@/lib/customerSession";
 
 interface Product {
   id: string;
@@ -139,14 +140,29 @@ export function MenuScreen({ onCartClick }: MenuScreenProps) {
           />
         </div>
         
-        <Button
-          variant="ghost"
-          onClick={() => window.location.href = "/points"}
-          className="bg-cafe-gold text-white px-4 py-2 rounded-full font-semibold hover:bg-cafe-gold/90"
-        >
-          <Star className="w-4 h-4 mr-1 fill-current" />
-          {loyaltyPoints} pts
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            onClick={() => window.location.href = "/points"}
+            className="bg-cafe-gold text-white px-4 py-2 rounded-full font-semibold hover:bg-cafe-gold/90"
+          >
+            <Star className="w-4 h-4 mr-1 fill-current" />
+            {loyaltyPoints} pts
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              logoutCustomer();
+              toast.success("Logged out successfully");
+            }}
+            className="text-cafe-dark hover:bg-cafe-dark/10 rounded-full"
+            title="Logout"
+          >
+            <LogOut className="w-5 h-5" />
+          </Button>
+        </div>
       </header>
 
       {/* Search Bar */}

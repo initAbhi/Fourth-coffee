@@ -1,13 +1,15 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Plus, Minus, Trash2, CreditCard, Wallet } from "lucide-react";
+import { ArrowLeft, Plus, Minus, Trash2, CreditCard, Wallet, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/contexts/CartContext";
 import Image from "next/image";
 import { useCustomerSession } from "@/hooks/useCustomerSession";
+import { logoutCustomer } from "@/lib/customerSession";
+import { toast } from "sonner";
 
 interface CartScreenProps {
   onBack: () => void;
@@ -22,19 +24,34 @@ export function CartScreen({ onBack, onCheckout }: CartScreenProps) {
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b border-border px-6 py-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="rounded-full"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-cafe-dark">Your Cart</h1>
+              <p className="text-sm text-cafe-dark/70">{itemCount} items</p>
+            </div>
+          </div>
+          
           <Button
             variant="ghost"
             size="icon"
-            onClick={onBack}
-            className="rounded-full"
+            onClick={() => {
+              logoutCustomer();
+              toast.success("Logged out successfully");
+            }}
+            className="text-cafe-dark hover:bg-cafe-dark/10 rounded-full"
+            title="Logout"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <LogOut className="w-5 h-5" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-cafe-dark">Your Cart</h1>
-            <p className="text-sm text-cafe-dark/70">{itemCount} items</p>
-          </div>
         </div>
       </div>
 

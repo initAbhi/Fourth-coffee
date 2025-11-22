@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, Coffee, Home } from "lucide-react";
+import { CheckCircle2, Coffee, Home, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Image from "next/image";
 import { useCustomerSession } from "@/hooks/useCustomerSession";
+import { logoutCustomer } from "@/lib/customerSession";
+import { toast } from "sonner";
 
 interface OrderTrackingScreenProps {
   onBackHome: () => void;
@@ -49,7 +51,23 @@ export function OrderTrackingScreen({ onBackHome }: OrderTrackingScreenProps) {
   return (
     <div className="min-h-screen bg-cafe-gradient pb-24">
       {/* Header */}
-      <div className="px-6 py-8 text-center">
+      <div className="px-6 py-8 text-center relative">
+        {/* Logout Button */}
+        <div className="absolute top-4 right-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              logoutCustomer();
+              toast.success("Logged out successfully");
+            }}
+            className="text-cafe-dark hover:bg-cafe-dark/10 rounded-full"
+            title="Logout"
+          >
+            <LogOut className="w-5 h-5" />
+          </Button>
+        </div>
+        
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
