@@ -15,6 +15,7 @@ import confetti from "canvas-confetti";
 import Image from "next/image";
 import { getCustomerSession, extendSession } from "@/lib/customerSession";
 import { useCustomerSession } from "@/hooks/useCustomerSession";
+import { initiateRazorpayPayment } from "@/services/razorpayService";
 
 interface CheckoutScreenProps {
   onBack: () => void;
@@ -122,18 +123,89 @@ export function CheckoutScreen({ onBack, onComplete }: CheckoutScreenProps) {
       if (paymentMethod === "loyalty_points") {
         if (!customerId) {
           toast.error("Please login to use loyalty points");
+          setIsProcessing(false);
           return;
         }
         if (loyaltyPoints < pointsRequired) {
           toast.error(`Insufficient loyalty points. You have ${loyaltyPoints} points, need ${pointsRequired} points.`);
+          setIsProcessing(false);
           return;
         }
       }
 
-      // Map payment method
+      // Handle Razorpay payments (card or wallet)
+      if (paymentMethod === "card" || paymentMethod === "wallet") {
+        // Prepare order details for Razorpay
+        const orderDetails = {
+          items: orderItems,
+          total: finalTotal,
+          customizations: customizations,
+        };
+
+        // Get table info - find table by table number
+        let tableId = null;
+        try {
+          const tableObj = await apiClient.getTables();
+          if (tableObj.success && tableObj.data) {
+            const table = tableObj.data.find((t: any) => t.tableNumber === tableNumber);
+            if (table) {
+              tableId = table.id;
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch table info:", error);
+          // Continue without tableId - backend can handle it
+        }
+
+        // Initiate Razorpay payment
+        await initiateRazorpayPayment(
+          {
+            amount: finalTotal,
+            currency: 'INR',
+            customerName: customerName || 'Guest Customer',
+            customerEmail: undefined,
+            customerPhone: customerPhone || '',
+            customerAddress: `Table ${tableNumber}`,
+            orderDetails,
+            tableId,
+            tableNumber,
+            isCashierOrder: false,
+          },
+          async (response) => {
+            console.log('Payment success callback:', response);
+            // Payment successful
+            setIsProcessing(false);
+            setShowSuccess(true);
+
+            // Fire confetti
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: { y: 0.6 },
+              colors: ["#563315", "#f0ddb6", "#b88933"],
+            });
+
+            // Clear cart and navigate to order tracking
+            setTimeout(() => {
+              clearCart();
+              console.log('Navigating to tracking screen...');
+              onComplete();
+            }, 2000); // Reduced from 3000 to 2000 for faster redirect
+          },
+          (error) => {
+            setIsProcessing(false);
+            if (error?.message?.includes('cancelled') || error?.message?.includes('closed')) {
+              toast.info("Payment cancelled");
+            } else {
+              toast.error(error?.message || "Payment failed. Please try again.");
+            }
+          }
+        );
+        return; // Don't proceed with regular order creation
+      }
+
+      // Handle pay later or loyalty points (non-Razorpay)
       const paymentMethodMap: Record<string, string> = {
-        card: "Card",
-        wallet: "UPI - Digital Wallet",
         pay_later: "Pay Later",
         loyalty_points: "Loyalty Points",
       };

@@ -476,8 +476,10 @@ class OrderService {
     await client.query(
       `INSERT INTO payments (
         id, order_id, customer_id, amount, payment_method, payment_type,
-        is_manual_flag, card_machine_used, confirmed_by, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        is_manual_flag, card_machine_used, confirmed_by, notes,
+        razorpay_order_id, razorpay_payment_id, razorpay_signature,
+        gateway, status, currency, transaction_id, completed_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
       [
         paymentId,
         data.orderId,
@@ -489,6 +491,14 @@ class OrderService {
         data.cardMachineUsed || false,
         data.confirmedBy,
         data.notes || null,
+        data.razorpayOrderId || null,
+        data.razorpayPaymentId || null,
+        data.razorpaySignature || null,
+        data.gateway || 'manual',
+        data.status || 'completed',
+        data.currency || 'INR',
+        data.transactionId || null,
+        data.status === 'completed' ? new Date() : null,
       ]
     );
     return paymentId;

@@ -124,12 +124,20 @@ const setupDatabase = async () => {
         customer_id VARCHAR(255) REFERENCES customers(id),
         amount DECIMAL(10, 2) NOT NULL,
         payment_method VARCHAR(100) NOT NULL,
-        payment_type VARCHAR(50) NOT NULL, -- 'card', 'upi', 'cash', 'wallet'
+        payment_type VARCHAR(50) NOT NULL, -- 'card', 'upi', 'cash', 'wallet', 'razorpay'
         is_manual_flag BOOLEAN DEFAULT FALSE,
         card_machine_used BOOLEAN DEFAULT FALSE,
         transaction_id VARCHAR(255),
         confirmed_by VARCHAR(255),
         notes TEXT,
+        -- Razorpay fields
+        razorpay_order_id VARCHAR(255),
+        razorpay_payment_id VARCHAR(255),
+        razorpay_signature VARCHAR(255),
+        gateway VARCHAR(50) DEFAULT 'razorpay', -- 'razorpay', 'cash', 'manual'
+        status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'completed', 'failed', 'refunded'
+        currency VARCHAR(10) DEFAULT 'INR',
+        completed_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);

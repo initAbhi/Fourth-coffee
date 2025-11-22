@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { X, CreditCard, Smartphone, Wallet, Banknote, Check } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
+import { initiateRazorpayPayment, verifyPaymentForOrder } from "@/services/razorpayService";
 
 interface PaymentConfirmationModalProps {
   orderId: string;
@@ -57,6 +58,72 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
     setIsProcessing(true);
 
     try {
+      // Handle Razorpay payments (Card or Wallet)
+      if (selectedPaymentMethod === "Card" || selectedPaymentMethod === "Wallet") {
+        // Get order details
+        const orderRes = await apiClient.getOrderById(orderId);
+        if (!orderRes.success || !orderRes.data) {
+          throw new Error("Order not found");
+        }
+
+        const order = orderRes.data;
+
+        // Initiate Razorpay payment
+        await initiateRazorpayPayment(
+          {
+            amount: orderTotal,
+            currency: 'INR',
+            customerName: customerName || 'Guest Customer',
+            customerPhone: customerPhone || '',
+            customerAddress: `Table ${order.tableNumber || ''}`,
+            orderDetails: {
+              items: order.items || [],
+              total: orderTotal,
+            },
+            tableId: order.tableId,
+            tableNumber: order.tableNumber,
+            isCashierOrder: true,
+            confirmedBy,
+          },
+          async (response) => {
+            // Payment successful - verify payment for existing order
+            try {
+              const verifyRes = await verifyPaymentForOrder(
+                orderId,
+                {
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                },
+                confirmedBy
+              );
+
+              if (verifyRes.success) {
+                toast.success("Payment confirmed successfully");
+                onSuccess();
+                onClose();
+              } else {
+                throw new Error(verifyRes.error || "Payment verification failed");
+              }
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Payment verification failed");
+            } finally {
+              setIsProcessing(false);
+            }
+          },
+          (error) => {
+            setIsProcessing(false);
+            if (error?.message?.includes('cancelled') || error?.message?.includes('closed')) {
+              toast.info("Payment cancelled");
+            } else {
+              toast.error(error?.message || "Payment failed. Please try again.");
+            }
+          }
+        );
+        return; // Don't proceed with regular payment confirmation
+      }
+
+      // Handle cash or other manual payment methods
       const response = await apiClient.confirmPayment(orderId, {
         paymentMethod: selectedPaymentMethod,
         isManualFlag,

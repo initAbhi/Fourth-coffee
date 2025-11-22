@@ -26,6 +26,7 @@ const topupRoutes = require('./routes/topupRoutes');
 const wastageRoutes = require('./routes/wastageRoutes');
 const auditTrailRoutes = require('./routes/auditTrailRoutes');
 const adminMessagesRoutes = require('./routes/adminMessagesRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 // Import services
 const SocketService = require('./services/socketService');
@@ -101,6 +102,7 @@ app.use('/api/topup', topupRoutes);
 app.use('/api/wastage', wastageRoutes);
 app.use('/api/audit-trail', auditTrailRoutes);
 app.use('/api/admin-messages', adminMessagesRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Error handling
 app.use(errorHandler);

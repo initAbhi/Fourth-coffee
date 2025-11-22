@@ -493,6 +493,43 @@ class ApiClient {
     const query = to ? `?to=${to}` : '';
     return this.request<{ count: number }>(`/admin-messages/unread-count${query}`);
   }
+
+  // Payments
+  async createRazorpayOrder(amount: number, currency: string = 'INR') {
+    return this.request<any>('/payments/createorder', {
+      method: 'POST',
+      body: JSON.stringify({ amount, currency }),
+    });
+  }
+
+  async verifyPayment(data: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+    orderDetails?: any;
+    customerInfo?: any;
+    tableId?: string;
+    tableNumber?: string;
+    isCashierOrder?: boolean;
+    confirmedBy?: string;
+  }) {
+    return this.request<any>('/payments/verifypayment', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async verifyPaymentForOrder(orderId: string, data: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+    confirmedBy?: string;
+  }) {
+    return this.request<any>(`/payments/verifypayment/${orderId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);
