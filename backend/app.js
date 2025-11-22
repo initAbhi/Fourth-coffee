@@ -42,7 +42,7 @@ console.log('🌐 Frontend URL configured:', FRONTEND_URL);
 
 const io = new Server(server, {
   cors: {
-    origin: FRONTEND_URL,
+    origin: "*",
     methods: ['GET', 'POST'],
   },
 });

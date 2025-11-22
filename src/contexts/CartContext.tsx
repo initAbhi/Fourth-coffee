@@ -45,12 +45,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         newItems[existingIndex].quantity += 1;
         toast.success("Added to cart", {
           description: `${item.name} quantity updated`,
+          id: `cart-${item.id}`, // Use ID to prevent duplicates
         });
         return newItems;
       }
 
       toast.success("Added to cart", {
         description: item.name,
+        id: `cart-${item.id}`, // Use ID to prevent duplicates
       });
       return [...prev, { ...item, quantity: 1 }];
     });
@@ -69,12 +71,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         newItems[existingIndex].quantity += quantity;
         toast.success("Added to cart", {
           description: `${item.name} quantity updated`,
+          id: `cart-${item.id}`, // Use ID to prevent duplicates
         });
         return newItems;
       }
 
       toast.success("Added to cart", {
         description: quantity > 1 ? `${item.name} (${quantity}x)` : item.name,
+        id: `cart-${item.id}`, // Use ID to prevent duplicates
       });
       return [...prev, { ...item, quantity }];
     });
